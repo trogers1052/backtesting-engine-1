@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "backtesting"
+version = "0.1.0"
+description = "Backtesting service for trading strategies"
+requires-python = ">=3.10"
+dependencies = [
+    "backtrader2>=1.9.76",
+    "pandas>=2.0.0",
+    "numpy>=1.24.0,<2.0.0",
+    "ta>=0.10.0",
+    "psycopg2-binary>=2.9.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "python-dotenv>=1.0.0",
+    "rich>=13.0.0",
+    "matplotlib>=3.8.0",
+]
+
+[project.scripts]
+backtesting = "backtesting.main:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["backtesting*"]
