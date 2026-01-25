@@ -1,7 +1,7 @@
 # Backtesting Service Dependencies
 
 # Backtesting engine
-backtrader2>=2.0.0
+backtrader2>=1.9.76
 
 # Data processing
 pandas>=2.0.0

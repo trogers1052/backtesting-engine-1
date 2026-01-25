@@ -1,0 +1,46 @@
+name: Build backtesting-service (Raspberry Pi)
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Build ARM64 Image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout backtesting-service
+        uses: actions/checkout@v4
+
+      - name: Checkout decision-engine
+        uses: actions/checkout@v4
+        with:
+          repository: trogers1052/decision-engine
+          path: decision_engine
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image (ARM64)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/arm64
+          push: true
+          tags: |
+            ghcr.io/trogers1052/backtesting-service:latest
+            ghcr.io/trogers1052/backtesting-service:${{ github.sha }}
