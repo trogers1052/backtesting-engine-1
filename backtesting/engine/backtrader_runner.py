@@ -17,7 +17,7 @@ from ..data import TimescaleLoader
 from ..indicators import calculate_indicators
 from ..strategies import DecisionEngineStrategy, create_strategy
 from .data_feed import create_data_feed
-from .sizer import PercentSizer
+from .sizer import PercentSizer, CompoundingSizer, FixedPercentSizer
 
 logger = logging.getLogger(__name__)
 
@@ -70,10 +70,12 @@ class BacktraderRunner:
         self,
         initial_cash: float = None,
         commission: float = None,
+        compound: bool = True,
     ):
         """Initialize the runner."""
         self.initial_cash = initial_cash or settings.default_initial_cash
         self.commission = commission or settings.default_commission
+        self.compound = compound
         self.loader = TimescaleLoader()
 
     def run(
@@ -159,8 +161,13 @@ class BacktraderRunner:
         cerebro.broker.setcash(self.initial_cash)
         cerebro.broker.setcommission(commission=self.commission)
 
-        # Add sizer
-        cerebro.addsizer(PercentSizer, percents=95)
+        # Add sizer based on compounding preference
+        if self.compound:
+            cerebro.addsizer(CompoundingSizer, percents=95)
+            logger.info("  Position sizing: Compounding (reinvesting profits)")
+        else:
+            cerebro.addsizer(FixedPercentSizer, percents=95, initial_capital=self.initial_cash)
+            logger.info("  Position sizing: Fixed (no reinvestment)")
 
         # Add analyzers
         cerebro.addanalyzer(bt.analyzers.SharpeRatio, _name="sharpe")
