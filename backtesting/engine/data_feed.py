@@ -30,6 +30,7 @@ class PandasDataWithIndicators(bt.feeds.PandasData):
         "bb_mid",
         "bb_upper",
         "atr_14",
+        "volume_sma_20",
     )
 
     # Map DataFrame columns to lines
@@ -53,6 +54,7 @@ class PandasDataWithIndicators(bt.feeds.PandasData):
         ("bb_mid", "BB_MID"),
         ("bb_upper", "BB_UPPER"),
         ("atr_14", "ATR_14"),
+        ("volume_sma_20", "volume_sma_20"),
     )
 
 

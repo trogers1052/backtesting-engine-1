@@ -177,6 +177,22 @@ class DecisionEngineStrategy(bt.Strategy):
             if val == val:
                 indicators["ATR_14"] = val
 
+        if hasattr(self.datas[0], "macd_histogram") and len(self.datas[0].macd_histogram) > 0:
+            val = self.datas[0].macd_histogram[0]
+            if val == val:
+                indicators["MACD_HISTOGRAM"] = val
+
+        # Add close and volume for enhanced rules
+        if len(self.datas[0].close) > 0:
+            indicators["close"] = self.datas[0].close[0]
+        if len(self.datas[0].volume) > 0:
+            indicators["volume"] = self.datas[0].volume[0]
+
+        if hasattr(self.datas[0], "volume_sma_20") and len(self.datas[0].volume_sma_20) > 0:
+            val = self.datas[0].volume_sma_20[0]
+            if val == val:
+                indicators["volume_sma_20"] = val
+
         # Current position
         position = None
         if self.position.size > 0:

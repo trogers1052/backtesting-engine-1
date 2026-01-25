@@ -92,6 +92,11 @@ def calculate_indicators(
     )
     result[f"ATR_{atr_period}"] = atr.average_true_range()
 
+    # Volume SMA (for volume confirmation in enhanced rules)
+    logger.debug("Calculating Volume SMA(20)")
+    volume_sma = SMAIndicator(close=result["volume"].astype(float), window=20)
+    result["volume_sma_20"] = volume_sma.sma_indicator()
+
     # Drop rows with NaN indicators (warm-up period)
     initial_rows = len(result)
     result = result.dropna(subset=[f"SMA_{max(sma_periods)}"])
