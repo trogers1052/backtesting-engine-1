@@ -1,0 +1,61 @@
+"""
+Backtesting Service Configuration
+
+Uses pydantic-settings for environment variable management.
+"""
+
+from datetime import date
+from typing import List, Optional
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    """Backtesting service configuration."""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    # Market Data Database (TimescaleDB)
+    market_data_db_host: str = "localhost"
+    market_data_db_port: int = 5433
+    market_data_db_user: str = "ingestor"
+    market_data_db_password: str = "ingestor"
+    market_data_db_name: str = "stock_db"
+
+    # Default backtest parameters
+    default_start_date: str = "2021-01-01"
+    default_end_date: Optional[str] = None  # None = today
+
+    # Strategy defaults
+    default_initial_cash: float = 100000.0
+    default_commission: float = 0.001  # 0.1% commission
+    default_profit_target: float = 0.07  # 7%
+    default_stop_loss: float = 0.05  # 5%
+    default_min_confidence: float = 0.6
+
+    # Position sizing
+    default_position_size_pct: float = 0.95  # Use 95% of available cash
+
+    # Indicator periods (match analytics-service)
+    rsi_period: int = 14
+    sma_periods: List[int] = [20, 50, 200]
+    macd_fast: int = 12
+    macd_slow: int = 26
+    macd_signal: int = 9
+    bb_period: int = 20
+    atr_period: int = 14
+
+    @property
+    def market_data_db_url(self) -> str:
+        """PostgreSQL connection URL for market data."""
+        return (
+            f"postgresql://{self.market_data_db_user}:{self.market_data_db_password}"
+            f"@{self.market_data_db_host}:{self.market_data_db_port}/{self.market_data_db_name}"
+        )
+
+
+# Global settings instance
+settings = Settings()
