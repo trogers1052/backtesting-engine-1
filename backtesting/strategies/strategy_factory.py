@@ -59,6 +59,23 @@ RULE_CONFIGS: Dict[str, Dict] = {
         "description": "Full trend alignment (SMA_20 > SMA_50 > SMA_200)",
         "default_params": {},
     },
+    # Enhanced rules
+    "enhanced_buy_dip": {
+        "description": "Enhanced dip buying with volume confirmation and stricter filters",
+        "default_params": {"rsi_oversold": 35.0, "min_trend_spread": 1.5},
+    },
+    "momentum_reversal": {
+        "description": "Buy RSI recovery + MACD bullish crossover",
+        "default_params": {},
+    },
+    "trend_continuation": {
+        "description": "Buy pullbacks to SMA_20 in strong uptrend",
+        "default_params": {"pullback_tolerance_pct": 2.0},
+    },
+    "average_down": {
+        "description": "Scale into position on deeper dips (use with --allow-scale-in)",
+        "default_params": {"rsi_extreme": 30.0, "max_scale_ins": 2},
+    },
 }
 
 
@@ -108,6 +125,9 @@ def create_strategy(
     profit_target: float = 0.07,
     stop_loss: float = 0.05,
     rule_params: Dict[str, Dict] = None,
+    allow_scale_in: bool = False,
+    max_scale_ins: int = 2,
+    scale_in_size: float = 0.5,
 ) -> Type[bt.Strategy]:
     """
     Create a backtrader Strategy class with decision-engine rules.
@@ -119,6 +139,9 @@ def create_strategy(
         profit_target: Profit target percentage
         stop_loss: Stop loss percentage
         rule_params: Optional parameter overrides per rule
+        allow_scale_in: Allow averaging down on deeper dips
+        max_scale_ins: Maximum number of scale-ins per position
+        scale_in_size: Scale-in size relative to initial position
 
     Returns:
         Configured DecisionEngineStrategy class
@@ -140,6 +163,9 @@ def create_strategy(
             ("profit_target", profit_target),
             ("stop_loss", stop_loss),
             ("log_trades", True),
+            ("allow_scale_in", allow_scale_in),
+            ("max_scale_ins", max_scale_ins),
+            ("scale_in_size", scale_in_size),
         )
 
     return ConfiguredStrategy

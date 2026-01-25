@@ -128,6 +128,25 @@ Examples:
         help="Require multiple rules to agree for signals",
     )
 
+    # Scale-in (averaging down) arguments
+    parser.add_argument(
+        "--allow-scale-in",
+        action="store_true",
+        help="Allow averaging down on deeper dips (use with average_down rule)",
+    )
+    parser.add_argument(
+        "--max-scale-ins",
+        type=int,
+        default=2,
+        help="Maximum number of scale-ins per position (default: 2)",
+    )
+    parser.add_argument(
+        "--scale-in-size",
+        type=float,
+        default=0.5,
+        help="Scale-in size relative to initial position (default: 0.5 = half)",
+    )
+
     # Capital arguments
     parser.add_argument(
         "--cash",
@@ -234,6 +253,9 @@ Examples:
                 profit_target=args.profit_target,
                 stop_loss=args.stop_loss,
                 require_consensus=args.require_consensus,
+                allow_scale_in=args.allow_scale_in,
+                max_scale_ins=args.max_scale_ins,
+                scale_in_size=args.scale_in_size,
             )
 
             # Output
@@ -259,6 +281,9 @@ Examples:
                 profit_target=args.profit_target,
                 stop_loss=args.stop_loss,
                 require_consensus=args.require_consensus,
+                allow_scale_in=args.allow_scale_in,
+                max_scale_ins=args.max_scale_ins,
+                scale_in_size=args.scale_in_size,
             )
 
             # Output
