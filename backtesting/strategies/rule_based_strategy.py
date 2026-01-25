@@ -52,17 +52,24 @@ class DecisionEngineStrategy(bt.Strategy):
         ("profit_target", 0.07),  # 7%
         ("stop_loss", 0.05),  # 5%
         ("log_trades", True),
+        ("allow_scale_in", False),  # Allow averaging down
+        ("max_scale_ins", 2),  # Max number of scale-ins
+        ("scale_in_size", 0.5),  # Size of scale-in relative to initial (0.5 = half size)
     )
 
     def __init__(self):
         """Initialize the strategy."""
         self.rules: List[Rule] = self.params.rules
         self.order = None
-        self.entry_price = None
+        self.entry_price = None  # Initial entry price
+        self.avg_cost_basis = None  # Average cost across all buys
         self.entry_date = None
         self.entry_reason = None
         self.entry_confidence = None
         self.entry_rules = []
+        self.scale_in_count = 0  # Number of scale-ins done
+        self.total_shares = 0  # Total shares held
+        self.total_cost = 0  # Total cost basis
 
         # Trade history
         self.trade_records: List[TradeRecord] = []
@@ -70,7 +77,8 @@ class DecisionEngineStrategy(bt.Strategy):
 
         logger.info(
             f"DecisionEngineStrategy initialized with {len(self.rules)} rules, "
-            f"min_confidence={self.params.min_confidence}"
+            f"min_confidence={self.params.min_confidence}, "
+            f"allow_scale_in={self.params.allow_scale_in}"
         )
         for rule in self.rules:
             logger.info(f"  - {rule.name}: {rule.description}")
@@ -88,30 +96,52 @@ class DecisionEngineStrategy(bt.Strategy):
 
         if order.status in [order.Completed]:
             if order.isbuy():
-                self.entry_price = order.executed.price
-                self.entry_date = self.datas[0].datetime.datetime(0)
-                self.log(
-                    f"BUY EXECUTED @ ${order.executed.price:.2f} "
-                    f"(confidence: {self.entry_confidence:.2f})"
-                )
+                executed_price = order.executed.price
+                executed_size = order.executed.size
+
+                # Track cost basis for averaging
+                self.total_shares += executed_size
+                self.total_cost += executed_price * executed_size
+                self.avg_cost_basis = self.total_cost / self.total_shares if self.total_shares > 0 else executed_price
+
+                is_scale_in = self.entry_price is not None
+
+                if is_scale_in:
+                    self.scale_in_count += 1
+                    self.log(
+                        f"SCALE-IN #{self.scale_in_count} @ ${executed_price:.2f} "
+                        f"(avg cost: ${self.avg_cost_basis:.2f}, confidence: {self.entry_confidence:.2f})"
+                    )
+                else:
+                    self.entry_price = executed_price
+                    self.entry_date = self.datas[0].datetime.datetime(0)
+                    self.log(
+                        f"BUY EXECUTED @ ${executed_price:.2f} "
+                        f"(confidence: {self.entry_confidence:.2f})"
+                    )
                 self.log(f"  Reason: {self.entry_reason}")
 
-                # Start trade record
-                self.current_trade = TradeRecord(
-                    symbol=self.datas[0]._name or "UNKNOWN",
-                    entry_date=self.entry_date,
-                    entry_price=self.entry_price,
-                    entry_reason=self.entry_reason,
-                    entry_confidence=self.entry_confidence,
-                    rules_triggered=self.entry_rules.copy(),
-                )
+                # Start trade record (only for initial entry)
+                if not is_scale_in:
+                    self.current_trade = TradeRecord(
+                        symbol=self.datas[0]._name or "UNKNOWN",
+                        entry_date=self.entry_date,
+                        entry_price=self.entry_price,
+                        entry_reason=self.entry_reason,
+                        entry_confidence=self.entry_confidence,
+                        rules_triggered=self.entry_rules.copy(),
+                    )
             else:
                 exit_price = order.executed.price
-                profit_pct = (exit_price - self.entry_price) / self.entry_price
+                # Use average cost basis for P&L calculation
+                cost_basis = self.avg_cost_basis or self.entry_price
+                profit_pct = (exit_price - cost_basis) / cost_basis if cost_basis else 0
                 self.log(
                     f"SELL EXECUTED @ ${exit_price:.2f} "
-                    f"({profit_pct:+.1%})"
+                    f"(vs avg cost ${cost_basis:.2f}: {profit_pct:+.1%})"
                 )
+                if self.scale_in_count > 0:
+                    self.log(f"  Position had {self.scale_in_count} scale-in(s)")
 
                 # Complete trade record
                 if self.current_trade:
@@ -121,8 +151,13 @@ class DecisionEngineStrategy(bt.Strategy):
                     self.trade_records.append(self.current_trade)
                     self.current_trade = None
 
+                # Reset all position tracking
                 self.entry_price = None
                 self.entry_date = None
+                self.avg_cost_basis = None
+                self.scale_in_count = 0
+                self.total_shares = 0
+                self.total_cost = 0
 
         elif order.status in [order.Canceled, order.Margin, order.Rejected]:
             self.log(f"Order Canceled/Margin/Rejected: {order.status}")
@@ -198,11 +233,19 @@ class DecisionEngineStrategy(bt.Strategy):
         if self.position.size > 0:
             position = "long"
 
+        # Build metadata for scale-in rules
+        metadata = {}
+        if self.entry_price is not None:
+            metadata["entry_price"] = self.entry_price
+            metadata["avg_cost_basis"] = self.avg_cost_basis
+            metadata["scale_in_count"] = self.scale_in_count
+
         return SymbolContext(
             symbol=self.datas[0]._name or "UNKNOWN",
             indicators=indicators,
             timestamp=self.datas[0].datetime.datetime(0),
             current_position=position,
+            metadata=metadata,
         )
 
     def _evaluate_rules(self, context: SymbolContext) -> tuple:
@@ -264,19 +307,22 @@ class DecisionEngineStrategy(bt.Strategy):
 
         current_price = self.datas[0].close[0]
 
+        # Use average cost basis for exit calculations (if available)
+        cost_basis = self.avg_cost_basis or self.entry_price
+
         # Check exit conditions if in position
-        if self.position.size > 0:
-            # Check profit target
-            if current_price >= self.entry_price * (1 + self.params.profit_target):
-                self.log(f"PROFIT TARGET reached @ ${current_price:.2f}")
+        if self.position.size > 0 and cost_basis:
+            # Check profit target (based on average cost)
+            if current_price >= cost_basis * (1 + self.params.profit_target):
+                self.log(f"PROFIT TARGET reached @ ${current_price:.2f} (avg cost: ${cost_basis:.2f})")
                 if self.current_trade:
                     self.current_trade.exit_reason = "Profit target"
                 self.order = self.sell()
                 return
 
-            # Check stop loss
-            if current_price <= self.entry_price * (1 - self.params.stop_loss):
-                self.log(f"STOP LOSS triggered @ ${current_price:.2f}")
+            # Check stop loss (based on average cost)
+            if current_price <= cost_basis * (1 - self.params.stop_loss):
+                self.log(f"STOP LOSS triggered @ ${current_price:.2f} (avg cost: ${cost_basis:.2f})")
                 if self.current_trade:
                     self.current_trade.exit_reason = "Stop loss"
                 self.order = self.sell()
@@ -287,11 +333,24 @@ class DecisionEngineStrategy(bt.Strategy):
         signal_type, confidence, reason, rules = self._evaluate_rules(context)
 
         # Execute signals
-        if signal_type == SignalType.BUY and self.position.size == 0:
-            self.entry_reason = reason
-            self.entry_confidence = confidence
-            self.entry_rules = rules
-            self.order = self.buy()
+        if signal_type == SignalType.BUY:
+            # New position
+            if self.position.size == 0:
+                self.entry_reason = reason
+                self.entry_confidence = confidence
+                self.entry_rules = rules
+                self.order = self.buy()
+
+            # Scale-in (average down)
+            elif (self.params.allow_scale_in and
+                  self.scale_in_count < self.params.max_scale_ins and
+                  "Average Down" in rules):
+                self.entry_reason = reason
+                self.entry_confidence = confidence
+                # Calculate scale-in size
+                scale_size = max(1, int(self.position.size * self.params.scale_in_size))
+                self.log(f"SCALE-IN signal: adding {scale_size} shares @ ${current_price:.2f}")
+                self.order = self.buy(size=scale_size)
 
         elif signal_type == SignalType.SELL and self.position.size > 0:
             if self.current_trade:

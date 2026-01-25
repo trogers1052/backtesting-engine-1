@@ -87,6 +87,9 @@ class BacktraderRunner:
         stop_loss: float = None,
         require_consensus: bool = False,
         rule_params: Dict[str, Dict] = None,
+        allow_scale_in: bool = False,
+        max_scale_ins: int = 2,
+        scale_in_size: float = 0.5,
     ) -> BacktestResult:
         """
         Run a backtest for a single symbol.
@@ -101,6 +104,9 @@ class BacktraderRunner:
             stop_loss: Stop loss percentage
             require_consensus: Require multiple rules to agree
             rule_params: Parameter overrides per rule
+            allow_scale_in: Allow averaging down on deeper dips
+            max_scale_ins: Maximum number of scale-ins per position
+            scale_in_size: Scale-in size relative to initial position
 
         Returns:
             BacktestResult with performance metrics
@@ -143,6 +149,9 @@ class BacktraderRunner:
             profit_target=profit_target,
             stop_loss=stop_loss,
             rule_params=rule_params,
+            allow_scale_in=allow_scale_in,
+            max_scale_ins=max_scale_ins,
+            scale_in_size=scale_in_size,
         )
         cerebro.addstrategy(strategy_class)
 
