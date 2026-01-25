@@ -1,14 +1,16 @@
 """
-Pandas-TA Indicator Bridge
+Technical Analysis Indicator Bridge
 
-Calculates technical indicators using pandas-ta to match the analytics-service.
+Calculates technical indicators using the 'ta' library to match the analytics-service.
 """
 
 import logging
 from typing import List
 
 import pandas as pd
-import pandas_ta as ta
+from ta.momentum import RSIIndicator
+from ta.trend import SMAIndicator, MACD
+from ta.volatility import BollingerBands, AverageTrueRange
 
 from ..config import settings
 
@@ -50,44 +52,45 @@ def calculate_indicators(
 
     # RSI
     logger.debug(f"Calculating RSI({rsi_period})")
-    result[f"RSI_{rsi_period}"] = ta.rsi(result["close"], length=rsi_period)
+    rsi = RSIIndicator(close=result["close"], window=rsi_period)
+    result[f"RSI_{rsi_period}"] = rsi.rsi()
 
     # SMAs
     for period in sma_periods:
         logger.debug(f"Calculating SMA({period})")
-        result[f"SMA_{period}"] = ta.sma(result["close"], length=period)
+        sma = SMAIndicator(close=result["close"], window=period)
+        result[f"SMA_{period}"] = sma.sma_indicator()
 
     # MACD
     logger.debug(f"Calculating MACD({macd_fast},{macd_slow},{macd_signal})")
-    macd_result = ta.macd(
-        result["close"],
-        fast=macd_fast,
-        slow=macd_slow,
-        signal=macd_signal,
+    macd = MACD(
+        close=result["close"],
+        window_slow=macd_slow,
+        window_fast=macd_fast,
+        window_sign=macd_signal,
     )
-    if macd_result is not None and not macd_result.empty:
-        result["MACD"] = macd_result.iloc[:, 0]  # MACD line
-        result["MACD_HISTOGRAM"] = macd_result.iloc[:, 1]  # Histogram
-        result["MACD_SIGNAL"] = macd_result.iloc[:, 2]  # Signal line
+    result["MACD"] = macd.macd()
+    result["MACD_SIGNAL"] = macd.macd_signal()
+    result["MACD_HISTOGRAM"] = macd.macd_diff()
 
     # Bollinger Bands
     logger.debug(f"Calculating Bollinger Bands({bb_period})")
-    bb_result = ta.bbands(result["close"], length=bb_period)
-    if bb_result is not None and not bb_result.empty:
-        result["BB_LOWER"] = bb_result.iloc[:, 0]
-        result["BB_MID"] = bb_result.iloc[:, 1]
-        result["BB_UPPER"] = bb_result.iloc[:, 2]
-        result["BB_BANDWIDTH"] = bb_result.iloc[:, 3] if bb_result.shape[1] > 3 else None
-        result["BB_PERCENT"] = bb_result.iloc[:, 4] if bb_result.shape[1] > 4 else None
+    bb = BollingerBands(close=result["close"], window=bb_period, window_dev=2)
+    result["BB_LOWER"] = bb.bollinger_lband()
+    result["BB_MID"] = bb.bollinger_mavg()
+    result["BB_UPPER"] = bb.bollinger_hband()
+    result["BB_BANDWIDTH"] = bb.bollinger_wband()
+    result["BB_PERCENT"] = bb.bollinger_pband()
 
     # ATR
     logger.debug(f"Calculating ATR({atr_period})")
-    result[f"ATR_{atr_period}"] = ta.atr(
-        result["high"],
-        result["low"],
-        result["close"],
-        length=atr_period,
+    atr = AverageTrueRange(
+        high=result["high"],
+        low=result["low"],
+        close=result["close"],
+        window=atr_period,
     )
+    result[f"ATR_{atr_period}"] = atr.average_true_range()
 
     # Drop rows with NaN indicators (warm-up period)
     initial_rows = len(result)
