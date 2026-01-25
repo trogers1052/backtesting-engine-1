@@ -342,15 +342,19 @@ class DecisionEngineStrategy(bt.Strategy):
                 self.order = self.buy()
 
             # Scale-in (average down)
-            elif (self.params.allow_scale_in and
-                  self.scale_in_count < self.params.max_scale_ins and
-                  "Average Down" in rules):
-                self.entry_reason = reason
-                self.entry_confidence = confidence
-                # Calculate scale-in size
-                scale_size = max(1, int(self.position.size * self.params.scale_in_size))
-                self.log(f"SCALE-IN signal: adding {scale_size} shares @ ${current_price:.2f}")
-                self.order = self.buy(size=scale_size)
+            elif self.params.allow_scale_in:
+                # Debug: log why scale-in might not happen
+                if self.scale_in_count >= self.params.max_scale_ins:
+                    logger.debug(f"Scale-in skipped: max scale-ins reached ({self.scale_in_count})")
+                elif "Average Down" not in rules:
+                    logger.debug(f"Scale-in skipped: Average Down not in triggered rules: {rules}")
+                else:
+                    self.entry_reason = reason
+                    self.entry_confidence = confidence
+                    # Calculate scale-in size
+                    scale_size = max(1, int(self.position.size * self.params.scale_in_size))
+                    self.log(f"SCALE-IN signal: adding {scale_size} shares @ ${current_price:.2f}")
+                    self.order = self.buy(size=scale_size)
 
         elif signal_type == SignalType.SELL and self.position.size > 0:
             if self.current_trade:
