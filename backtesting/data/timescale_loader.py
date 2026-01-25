@@ -1,7 +1,7 @@
 """
 TimescaleDB Data Loader
 
-Loads OHLCV data from the TimescaleDB ohlcv_1day continuous aggregate.
+Loads OHLCV data from the TimescaleDB ohlcv_1min continuous aggregate.
 """
 
 import logging
@@ -68,19 +68,21 @@ class TimescaleLoader:
 
         logger.info(f"Loading {symbol} data from {start_date} to {end_date}")
 
+        # Aggregate 1-minute bars to daily OHLCV
         query = """
             SELECT
-                time as datetime,
-                open,
-                high,
-                low,
-                close,
-                volume
-            FROM ohlcv_1day
+                time_bucket('1 day', time) as datetime,
+                (array_agg(open ORDER BY time ASC))[1] as open,
+                MAX(high) as high,
+                MIN(low) as low,
+                (array_agg(close ORDER BY time DESC))[1] as close,
+                SUM(volume) as volume
+            FROM ohlcv_1min
             WHERE symbol = %s
               AND time >= %s
               AND time <= %s
-            ORDER BY time ASC;
+            GROUP BY time_bucket('1 day', time)
+            ORDER BY datetime ASC;
         """
 
         try:
@@ -115,7 +117,7 @@ class TimescaleLoader:
         """Get list of symbols available in the database."""
         query = """
             SELECT DISTINCT symbol
-            FROM ohlcv_1day
+            FROM ohlcv_1min
             ORDER BY symbol;
         """
 
@@ -135,7 +137,7 @@ class TimescaleLoader:
                 MIN(time) as min_date,
                 MAX(time) as max_date,
                 COUNT(*) as bar_count
-            FROM ohlcv_1day
+            FROM ohlcv_1min
             WHERE symbol = %s;
         """
 
