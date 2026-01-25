@@ -76,6 +76,27 @@ RULE_CONFIGS: Dict[str, Dict] = {
         "description": "Scale into position on deeper dips (use with --allow-scale-in)",
         "default_params": {"rsi_extreme": 30.0, "max_scale_ins": 2},
     },
+    # Mining Stock Rules
+    "commodity_breakout": {
+        "description": "Buy miners on breakout above SMA_20 (commodity leverage play)",
+        "default_params": {"breakout_threshold_pct": 2.0},
+    },
+    "miner_metal_ratio": {
+        "description": "Buy miners when oversold at support (mean reversion)",
+        "default_params": {"rsi_oversold": 35.0},
+    },
+    "dollar_weakness": {
+        "description": "Buy miners in strong uptrend (USD weakness indicator)",
+        "default_params": {"min_trend_spread": 2.0},
+    },
+    "seasonality": {
+        "description": "Adjust signals based on seasonal patterns (strong Jan-Feb, Aug-Sep)",
+        "default_params": {},
+    },
+    "volume_breakout": {
+        "description": "Buy miners on 1.5x+ volume breakouts (high conviction)",
+        "default_params": {"min_volume_ratio": 1.5},
+    },
 }
 
 
