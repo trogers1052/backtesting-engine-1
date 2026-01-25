@@ -1,0 +1,25 @@
+# Backtesting Service Dependencies
+
+# Backtesting engine
+backtrader2>=2.0.0
+
+# Data processing
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Technical analysis (matches analytics-service)
+pandas-ta>=0.3.0
+
+# Database
+psycopg2-binary>=2.9.0
+
+# Configuration
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+python-dotenv>=1.0.0
+
+# Pretty console output
+rich>=13.0.0
+
+# Visualization (optional)
+matplotlib>=3.8.0
