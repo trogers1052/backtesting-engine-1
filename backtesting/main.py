@@ -160,6 +160,17 @@ Examples:
         default=settings.default_commission,
         help=f"Commission rate (default: {settings.default_commission})",
     )
+    parser.add_argument(
+        "--compound",
+        action="store_true",
+        default=True,
+        help="Reinvest profits into larger positions (default: enabled)",
+    )
+    parser.add_argument(
+        "--no-compound",
+        action="store_true",
+        help="Use fixed position sizes based on initial capital (no reinvestment)",
+    )
 
     # Output arguments
     parser.add_argument(
@@ -234,10 +245,14 @@ Examples:
     if args.quiet:
         logging.getLogger().setLevel(logging.WARNING)
 
+    # Determine compounding mode
+    compound = not args.no_compound  # Default is to compound
+
     # Create runner
     runner = BacktraderRunner(
         initial_cash=args.cash,
         commission=args.commission,
+        compound=compound,
     )
 
     # Run backtest(s)
