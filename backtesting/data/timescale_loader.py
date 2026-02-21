@@ -37,13 +37,17 @@ class TimescaleLoader:
 
     def _get_connection(self):
         """Create database connection."""
-        return psycopg2.connect(
-            host=self.host,
-            port=self.port,
-            user=self.user,
-            password=self.password,
-            database=self.database,
-        )
+        try:
+            return psycopg2.connect(
+                host=self.host,
+                port=self.port,
+                user=self.user,
+                password=self.password,
+                database=self.database,
+                connect_timeout=10,
+            )
+        except Exception:
+            raise
 
     def load(
         self,
@@ -85,11 +89,12 @@ class TimescaleLoader:
             ORDER BY datetime ASC;
         """
 
+        conn = None
         try:
-            with self._get_connection() as conn:
-                with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                    cur.execute(query, (symbol, start_date, end_date))
-                    rows = cur.fetchall()
+            conn = self._get_connection()
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(query, (symbol, start_date, end_date))
+                rows = cur.fetchall()
 
             if not rows:
                 logger.warning(f"No data found for {symbol}")
@@ -112,6 +117,9 @@ class TimescaleLoader:
         except Exception as e:
             logger.error(f"Failed to load data for {symbol}: {e}")
             raise
+        finally:
+            if conn is not None:
+                conn.close()
 
     def get_available_symbols(self) -> list:
         """Get list of symbols available in the database."""
@@ -121,14 +129,18 @@ class TimescaleLoader:
             ORDER BY symbol;
         """
 
+        conn = None
         try:
-            with self._get_connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute(query)
-                    return [row[0] for row in cur.fetchall()]
+            conn = self._get_connection()
+            with conn.cursor() as cur:
+                cur.execute(query)
+                return [row[0] for row in cur.fetchall()]
         except Exception as e:
             logger.error(f"Failed to get symbols: {e}")
             return []
+        finally:
+            if conn is not None:
+                conn.close()
 
     def get_date_range(self, symbol: str) -> tuple:
         """Get available date range for a symbol."""
@@ -141,11 +153,12 @@ class TimescaleLoader:
             WHERE symbol = %s;
         """
 
+        conn = None
         try:
-            with self._get_connection() as conn:
-                with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                    cur.execute(query, (symbol,))
-                    row = cur.fetchone()
+            conn = self._get_connection()
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(query, (symbol,))
+                row = cur.fetchone()
 
             if row and row["min_date"]:
                 return (row["min_date"], row["max_date"], row["bar_count"])
@@ -154,3 +167,6 @@ class TimescaleLoader:
         except Exception as e:
             logger.error(f"Failed to get date range for {symbol}: {e}")
             return (None, None, 0)
+        finally:
+            if conn is not None:
+                conn.close()
