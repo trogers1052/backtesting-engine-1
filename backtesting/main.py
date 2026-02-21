@@ -29,6 +29,7 @@ Usage:
 
 import argparse
 import logging
+import signal
 import sys
 from datetime import date, datetime
 from typing import List
@@ -45,6 +46,9 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+# Module-level flag for cooperative shutdown during long-running backtests.
+_shutdown_requested = False
 
 
 def parse_date(date_str: str) -> date:
@@ -65,8 +69,24 @@ def parse_rules(rules_str: str) -> List[str]:
     return [r.strip().lower() for r in rules_str.split(",")]
 
 
+def _handle_shutdown(signum, frame):
+    """Handle SIGINT/SIGTERM for graceful shutdown."""
+    global _shutdown_requested
+    sig_name = signal.Signals(signum).name
+    if _shutdown_requested:
+        # Second signal: force exit immediately
+        logger.warning(f"Received {sig_name} again, forcing exit")
+        sys.exit(1)
+    logger.info(f"Received {sig_name}, finishing current backtest then exiting...")
+    _shutdown_requested = True
+
+
 def main():
     """Main entry point for the backtesting service."""
+    # Register signal handlers for clean shutdown
+    signal.signal(signal.SIGTERM, _handle_shutdown)
+    signal.signal(signal.SIGINT, _handle_shutdown)
+
     parser = argparse.ArgumentParser(
         description="Backtest trading strategies against historical data",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -255,23 +275,25 @@ Examples:
         compound=compound,
     )
 
+    # Common run kwargs shared across single and multi-symbol backtests
+    run_kwargs = dict(
+        start_date=args.start,
+        end_date=args.end,
+        rules=rules,
+        min_confidence=args.min_confidence,
+        profit_target=args.profit_target,
+        stop_loss=args.stop_loss,
+        require_consensus=args.require_consensus,
+        allow_scale_in=args.allow_scale_in,
+        max_scale_ins=args.max_scale_ins,
+        scale_in_size=args.scale_in_size,
+    )
+
     # Run backtest(s)
     try:
         if len(symbols) == 1:
             # Single symbol
-            result = runner.run(
-                symbol=symbols[0],
-                start_date=args.start,
-                end_date=args.end,
-                rules=rules,
-                min_confidence=args.min_confidence,
-                profit_target=args.profit_target,
-                stop_loss=args.stop_loss,
-                require_consensus=args.require_consensus,
-                allow_scale_in=args.allow_scale_in,
-                max_scale_ins=args.max_scale_ins,
-                scale_in_size=args.scale_in_size,
-            )
+            result = runner.run(symbol=symbols[0], **run_kwargs)
 
             # Output
             if not args.quiet:
@@ -286,34 +308,37 @@ Examples:
                 print(f"Results exported to {args.output}")
 
         else:
-            # Multiple symbols
-            results = runner.run_multiple(
-                symbols=symbols,
-                start_date=args.start,
-                end_date=args.end,
-                rules=rules,
-                min_confidence=args.min_confidence,
-                profit_target=args.profit_target,
-                stop_loss=args.stop_loss,
-                require_consensus=args.require_consensus,
-                allow_scale_in=args.allow_scale_in,
-                max_scale_ins=args.max_scale_ins,
-                scale_in_size=args.scale_in_size,
-            )
+            # Multiple symbols — run individually so we can check for
+            # shutdown between symbols for cooperative cancellation.
+            results = {}
+            for symbol in symbols:
+                if _shutdown_requested:
+                    logger.info(
+                        f"Shutdown requested, skipping remaining symbols "
+                        f"({len(symbols) - len(results)} of {len(symbols)} left)"
+                    )
+                    break
+                try:
+                    results[symbol] = runner.run(symbol=symbol, **run_kwargs)
+                except Exception as e:
+                    logger.error(f"Failed to backtest {symbol}: {e}")
 
-            # Output
-            if not args.quiet:
-                print_multi_report(results)
+            # Output whatever results we collected
+            if results:
+                if not args.quiet:
+                    print_multi_report(results)
 
-                if args.show_trades:
-                    for symbol, result in results.items():
-                        print(f"\n{'=' * 60}")
-                        print(f"Trades for {symbol}:")
-                        print_report(result, show_trades=True, trade_limit=args.trade_limit)
+                    if args.show_trades:
+                        for sym, res in results.items():
+                            print(f"\n{'=' * 60}")
+                            print(f"Trades for {sym}:")
+                            print_report(res, show_trades=True, trade_limit=args.trade_limit)
 
-            if args.output:
-                export_json(results, args.output)
-                print(f"Results exported to {args.output}")
+                if args.output:
+                    export_json(results, args.output)
+                    print(f"Results exported to {args.output}")
+            elif not _shutdown_requested:
+                logger.warning("No backtest results produced")
 
     except Exception as e:
         logger.error(f"Backtest failed: {e}")
@@ -321,6 +346,9 @@ Examples:
             import traceback
             traceback.print_exc()
         return 1
+
+    if _shutdown_requested:
+        logger.info("Backtesting service shut down cleanly")
 
     return 0
 
