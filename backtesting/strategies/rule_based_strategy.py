@@ -13,8 +13,11 @@ from typing import Dict, List, Optional
 import backtrader as bt
 
 # Import decision-engine components
+import os
 import sys
-sys.path.insert(0, "/Users/thomasrogers/Projects/decision-engine")
+decision_engine_path = os.environ.get("DECISION_ENGINE_PATH", "/app")
+if decision_engine_path not in sys.path:
+    sys.path.insert(0, decision_engine_path)
 
 from decision_engine.rules.base import Rule, SymbolContext, SignalType
 from decision_engine.rules.registry import RuleRegistry
@@ -371,9 +374,10 @@ class DecisionEngineStrategy(bt.Strategy):
                 self.current_trade.exit_reason = "End of backtest"
                 self.current_trade.exit_date = self.datas[0].datetime.datetime(0)
                 self.current_trade.exit_price = self.datas[0].close[0]
+                cost_basis = self.avg_cost_basis if self.avg_cost_basis else self.current_trade.entry_price
                 profit_pct = (
-                    self.current_trade.exit_price - self.current_trade.entry_price
-                ) / self.current_trade.entry_price
+                    self.current_trade.exit_price - cost_basis
+                ) / cost_basis
                 self.current_trade.profit_pct = profit_pct
                 self.trade_records.append(self.current_trade)
 
