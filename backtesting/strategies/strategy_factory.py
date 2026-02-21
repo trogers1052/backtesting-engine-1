@@ -11,7 +11,10 @@ from typing import Dict, List, Type
 import backtrader as bt
 
 # Import decision-engine components
-sys.path.insert(0, "/Users/thomasrogers/Projects/decision-engine")
+import os
+decision_engine_path = os.environ.get("DECISION_ENGINE_PATH", "/app")
+if decision_engine_path not in sys.path:
+    sys.path.insert(0, decision_engine_path)
 
 from decision_engine.rules.base import Rule
 from decision_engine.rules.registry import RULE_REGISTRY, RuleRegistry
