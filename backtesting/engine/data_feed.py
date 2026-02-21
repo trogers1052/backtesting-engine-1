@@ -29,6 +29,8 @@ class PandasDataWithIndicators(bt.feeds.PandasData):
         "bb_lower",
         "bb_mid",
         "bb_upper",
+        "bb_bandwidth",
+        "bb_percent",
         "atr_14",
         "volume_sma_20",
     )
@@ -53,6 +55,8 @@ class PandasDataWithIndicators(bt.feeds.PandasData):
         ("bb_lower", "BB_LOWER"),
         ("bb_mid", "BB_MID"),
         ("bb_upper", "BB_UPPER"),
+        ("bb_bandwidth", "BB_BANDWIDTH"),
+        ("bb_percent", "BB_PERCENT"),
         ("atr_14", "ATR_14"),
         ("volume_sma_20", "volume_sma_20"),
     )
