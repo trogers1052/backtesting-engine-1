@@ -59,6 +59,7 @@ class DecisionEngineStrategy(bt.Strategy):
         ("allow_scale_in", False),  # Allow averaging down
         ("max_scale_ins", 2),  # Max number of scale-ins
         ("scale_in_size", 0.5),  # Size of scale-in relative to initial (0.5 = half size)
+        ("warmup_bars", 200),
     )
 
     def __init__(self):
@@ -74,6 +75,8 @@ class DecisionEngineStrategy(bt.Strategy):
         self.scale_in_count = 0  # Number of scale-ins done
         self.total_shares = 0  # Total shares held
         self.total_cost = 0  # Total cost basis
+
+        self.bar_count = 0
 
         # Trade history
         self.trade_records: List[TradeRecord] = []
@@ -137,9 +140,19 @@ class DecisionEngineStrategy(bt.Strategy):
                     )
             else:
                 exit_price = order.executed.price
-                # Use average cost basis for P&L calculation
                 cost_basis = self.avg_cost_basis or self.entry_price
                 profit_pct = (exit_price - cost_basis) / cost_basis if cost_basis else 0
+
+                bt_pnl = getattr(order.executed, 'pnl', None)
+                if bt_pnl is not None and cost_basis and self.total_shares > 0:
+                    bt_profit_pct = bt_pnl / (cost_basis * self.total_shares)
+                    if abs(profit_pct - bt_profit_pct) > 0.01:
+                        logger.warning(
+                            f"P&L drift detected: custom={profit_pct:+.2%}, "
+                            f"backtrader={bt_profit_pct:+.2%}, diff={abs(profit_pct - bt_profit_pct):.2%}"
+                        )
+                        profit_pct = bt_profit_pct
+
                 self.log(
                     f"SELL EXECUTED @ ${exit_price:.2f} "
                     f"(vs avg cost ${cost_basis:.2f}: {profit_pct:+.1%})"
@@ -305,6 +318,11 @@ class DecisionEngineStrategy(bt.Strategy):
 
     def next(self):
         """Process each bar."""
+        self.bar_count += 1
+
+        if self.bar_count <= self.params.warmup_bars:
+            return
+
         # Skip if we have a pending order
         if self.order:
             return

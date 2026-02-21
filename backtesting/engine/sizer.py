@@ -30,6 +30,8 @@ class PercentSizer(bt.Sizer):
 
         available = cash * (self.params.percents / 100.0)
         size = int(available / price)
+        if size <= 0:
+            return 0
 
         return size
 
@@ -65,6 +67,8 @@ class CompoundingSizer(bt.Sizer):
         available = min(available, cash * 0.99)
 
         size = int(available / price)
+        if size <= 0:
+            return 0
         return size
 
 
@@ -101,6 +105,8 @@ class FixedPercentSizer(bt.Sizer):
         available = min(available, cash * 0.99)
 
         size = int(available / price)
+        if size <= 0:
+            return 0
         return size
 
 
@@ -124,4 +130,6 @@ class FixedCashSizer(bt.Sizer):
             return 0
 
         size = int(self.params.cash / price)
+        if size <= 0:
+            return 0
         return size

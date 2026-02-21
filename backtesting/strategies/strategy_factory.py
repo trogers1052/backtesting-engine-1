@@ -108,6 +108,31 @@ def list_available_rules() -> Dict[str, str]:
     return {name: config["description"] for name, config in RULE_CONFIGS.items()}
 
 
+POSITIVE_NUMERIC_PARAMS = {
+    "rsi_threshold", "rsi_oversold", "rsi_extreme", "threshold",
+    "min_trend_spread", "pullback_tolerance_pct", "breakout_threshold_pct",
+    "min_volume_ratio", "max_scale_ins",
+}
+
+CONFIDENCE_PARAMS = {"min_confidence", "confidence"}
+
+
+def _validate_rule_params(name: str, rule_params: Dict) -> bool:
+    for key, value in rule_params.items():
+        if value is None:
+            logger.error(f"Rule {name}: parameter '{key}' is None")
+            return False
+        if key in POSITIVE_NUMERIC_PARAMS:
+            if not isinstance(value, (int, float)) or value <= 0:
+                logger.error(f"Rule {name}: parameter '{key}' must be a positive number, got {value}")
+                return False
+        if key in CONFIDENCE_PARAMS:
+            if not isinstance(value, (int, float)) or not (0 <= value <= 1):
+                logger.error(f"Rule {name}: parameter '{key}' must be in [0, 1], got {value}")
+                return False
+    return True
+
+
 def create_rules(rule_names: List[str], params: Dict[str, Dict] = None) -> List[Rule]:
     """
     Create Rule instances from rule names.
@@ -131,6 +156,10 @@ def create_rules(rule_names: List[str], params: Dict[str, Dict] = None) -> List[
         rule_params = RULE_CONFIGS.get(name, {}).get("default_params", {}).copy()
         if name in params:
             rule_params.update(params[name])
+
+        if not _validate_rule_params(name, rule_params):
+            logger.warning(f"Skipping rule {name} due to invalid parameters")
+            continue
 
         try:
             rule = RuleRegistry.create_rule(name, rule_params)

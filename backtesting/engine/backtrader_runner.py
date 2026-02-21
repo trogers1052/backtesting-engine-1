@@ -200,7 +200,10 @@ class BacktraderRunner:
         # Profit factor
         gross_profit = won.get("pnl", {}).get("total", 0)
         gross_loss = abs(lost.get("pnl", {}).get("total", 0))
-        profit_factor = gross_profit / gross_loss if gross_loss > 0 else float("inf")
+        if gross_loss > 0:
+            profit_factor = min(gross_profit / gross_loss, 999.99)
+        else:
+            profit_factor = 999.99 if gross_profit > 0 else 0.0
 
         # Sharpe ratio
         sharpe_analysis = strategy.analyzers.sharpe.get_analysis()
