@@ -29,11 +29,11 @@ class TimescaleLoader:
         database: Optional[str] = None,
     ):
         """Initialize loader with database connection parameters."""
-        self.host = host or settings.market_data_db_host
-        self.port = port or settings.market_data_db_port
-        self.user = user or settings.market_data_db_user
-        self.password = password or settings.market_data_db_password
-        self.database = database or settings.market_data_db_name
+        self.host = host if host is not None else settings.market_data_db_host
+        self.port = port if port is not None else settings.market_data_db_port
+        self.user = user if user is not None else settings.market_data_db_user
+        self.password = password if password is not None else settings.market_data_db_password
+        self.database = database if database is not None else settings.market_data_db_name
 
     def _get_connection(self):
         """Create database connection."""

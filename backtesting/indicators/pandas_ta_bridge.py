@@ -41,13 +41,13 @@ def calculate_indicators(
         DataFrame with additional indicator columns
     """
     # Use defaults from settings if not provided
-    rsi_period = rsi_period or settings.rsi_period
-    sma_periods = sma_periods or settings.sma_periods
-    macd_fast = macd_fast or settings.macd_fast
-    macd_slow = macd_slow or settings.macd_slow
-    macd_signal = macd_signal or settings.macd_signal
-    bb_period = bb_period or settings.bb_period
-    atr_period = atr_period or settings.atr_period
+    rsi_period = rsi_period if rsi_period is not None else settings.rsi_period
+    sma_periods = sma_periods if sma_periods is not None else settings.sma_periods
+    macd_fast = macd_fast if macd_fast is not None else settings.macd_fast
+    macd_slow = macd_slow if macd_slow is not None else settings.macd_slow
+    macd_signal = macd_signal if macd_signal is not None else settings.macd_signal
+    bb_period = bb_period if bb_period is not None else settings.bb_period
+    atr_period = atr_period if atr_period is not None else settings.atr_period
 
     result = df.copy()
 
@@ -114,5 +114,5 @@ def calculate_indicators(
 
 def get_required_warmup_bars(sma_periods: List[int] = None) -> int:
     """Get number of bars needed for indicator warm-up."""
-    periods = sma_periods or settings.sma_periods
+    periods = sma_periods if sma_periods is not None else settings.sma_periods
     return max(periods) + 10  # Extra buffer

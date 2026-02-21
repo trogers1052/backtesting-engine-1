@@ -234,6 +234,31 @@ class DecisionEngineStrategy(bt.Strategy):
             if math.isfinite(val):
                 indicators["MACD_HISTOGRAM"] = val
 
+        if hasattr(self.datas[0], "bb_lower") and len(self.datas[0].bb_lower) > 0:
+            val = self.datas[0].bb_lower[0]
+            if math.isfinite(val):
+                indicators["BB_LOWER"] = val
+
+        if hasattr(self.datas[0], "bb_mid") and len(self.datas[0].bb_mid) > 0:
+            val = self.datas[0].bb_mid[0]
+            if math.isfinite(val):
+                indicators["BB_MID"] = val
+
+        if hasattr(self.datas[0], "bb_upper") and len(self.datas[0].bb_upper) > 0:
+            val = self.datas[0].bb_upper[0]
+            if math.isfinite(val):
+                indicators["BB_UPPER"] = val
+
+        if hasattr(self.datas[0], "bb_bandwidth") and len(self.datas[0].bb_bandwidth) > 0:
+            val = self.datas[0].bb_bandwidth[0]
+            if math.isfinite(val):
+                indicators["BB_BANDWIDTH"] = val
+
+        if hasattr(self.datas[0], "bb_percent") and len(self.datas[0].bb_percent) > 0:
+            val = self.datas[0].bb_percent[0]
+            if math.isfinite(val):
+                indicators["BB_PERCENT"] = val
+
         # Add close and volume for enhanced rules
         if len(self.datas[0].close) > 0:
             indicators["close"] = self.datas[0].close[0]

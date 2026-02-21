@@ -73,8 +73,8 @@ class BacktraderRunner:
         compound: bool = True,
     ):
         """Initialize the runner."""
-        self.initial_cash = initial_cash or settings.default_initial_cash
-        self.commission = commission or settings.default_commission
+        self.initial_cash = initial_cash if initial_cash is not None else settings.default_initial_cash
+        self.commission = commission if commission is not None else settings.default_commission
         self.compound = compound
         self.loader = TimescaleLoader()
 
@@ -119,9 +119,9 @@ class BacktraderRunner:
         ).date()
         end_date = end_date or date.today()
         rules = rules or ["buy_dip_in_uptrend"]
-        min_confidence = min_confidence or settings.default_min_confidence
-        profit_target = profit_target or settings.default_profit_target
-        stop_loss = stop_loss or settings.default_stop_loss
+        min_confidence = min_confidence if min_confidence is not None else settings.default_min_confidence
+        profit_target = profit_target if profit_target is not None else settings.default_profit_target
+        stop_loss = stop_loss if stop_loss is not None else settings.default_stop_loss
 
         logger.info(f"Running backtest for {symbol}")
         logger.info(f"  Period: {start_date} to {end_date}")
