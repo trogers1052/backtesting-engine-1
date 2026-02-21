@@ -5,6 +5,7 @@ Wraps decision-engine rules into a backtrader Strategy.
 """
 
 import logging
+import math
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Dict, List, Optional
@@ -179,42 +180,42 @@ class DecisionEngineStrategy(bt.Strategy):
         # Map data feed lines to indicator names
         if hasattr(self.datas[0], "rsi_14") and len(self.datas[0].rsi_14) > 0:
             val = self.datas[0].rsi_14[0]
-            if val == val:  # Check not NaN
+            if math.isfinite(val):
                 indicators["RSI_14"] = val
 
         if hasattr(self.datas[0], "sma_20") and len(self.datas[0].sma_20) > 0:
             val = self.datas[0].sma_20[0]
-            if val == val:
+            if math.isfinite(val):
                 indicators["SMA_20"] = val
 
         if hasattr(self.datas[0], "sma_50") and len(self.datas[0].sma_50) > 0:
             val = self.datas[0].sma_50[0]
-            if val == val:
+            if math.isfinite(val):
                 indicators["SMA_50"] = val
 
         if hasattr(self.datas[0], "sma_200") and len(self.datas[0].sma_200) > 0:
             val = self.datas[0].sma_200[0]
-            if val == val:
+            if math.isfinite(val):
                 indicators["SMA_200"] = val
 
         if hasattr(self.datas[0], "macd") and len(self.datas[0].macd) > 0:
             val = self.datas[0].macd[0]
-            if val == val:
+            if math.isfinite(val):
                 indicators["MACD"] = val
 
         if hasattr(self.datas[0], "macd_signal") and len(self.datas[0].macd_signal) > 0:
             val = self.datas[0].macd_signal[0]
-            if val == val:
+            if math.isfinite(val):
                 indicators["MACD_SIGNAL"] = val
 
         if hasattr(self.datas[0], "atr_14") and len(self.datas[0].atr_14) > 0:
             val = self.datas[0].atr_14[0]
-            if val == val:
+            if math.isfinite(val):
                 indicators["ATR_14"] = val
 
         if hasattr(self.datas[0], "macd_histogram") and len(self.datas[0].macd_histogram) > 0:
             val = self.datas[0].macd_histogram[0]
-            if val == val:
+            if math.isfinite(val):
                 indicators["MACD_HISTOGRAM"] = val
 
         # Add close and volume for enhanced rules
@@ -225,7 +226,7 @@ class DecisionEngineStrategy(bt.Strategy):
 
         if hasattr(self.datas[0], "volume_sma_20") and len(self.datas[0].volume_sma_20) > 0:
             val = self.datas[0].volume_sma_20[0]
-            if val == val:
+            if math.isfinite(val):
                 indicators["volume_sma_20"] = val
 
         # Current position
