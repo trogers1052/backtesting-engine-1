@@ -201,6 +201,26 @@ Examples:
         help=f"ATR multiplier for stop calculation (default: {settings.default_atr_multiplier})",
     )
 
+    # Trade filter arguments
+    parser.add_argument(
+        "--max-extension",
+        type=float,
+        default=settings.default_max_price_extension_pct,
+        help=f"Max price extension above SMA_20 %% to allow entry (default: {settings.default_max_price_extension_pct})",
+    )
+    parser.add_argument(
+        "--cooldown-bars",
+        type=int,
+        default=settings.default_cooldown_bars,
+        help=f"Bars to wait after exit before re-entry (default: {settings.default_cooldown_bars})",
+    )
+    parser.add_argument(
+        "--max-trend-spread",
+        type=float,
+        default=settings.default_max_trend_spread_pct,
+        help=f"Max SMA_20/SMA_50 spread %% (default: {settings.default_max_trend_spread_pct})",
+    )
+
     # Capital arguments
     parser.add_argument(
         "--cash",
@@ -326,6 +346,9 @@ Examples:
         scale_in_size=args.scale_in_size,
         stop_mode=args.stop_mode,
         atr_multiplier=args.atr_multiplier,
+        max_price_extension_pct=args.max_extension,
+        cooldown_bars=args.cooldown_bars,
+        max_trend_spread_pct=args.max_trend_spread,
     )
 
     # Run backtest(s)

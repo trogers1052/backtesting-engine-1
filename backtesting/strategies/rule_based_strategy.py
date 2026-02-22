@@ -64,6 +64,9 @@ class DecisionEngineStrategy(bt.Strategy):
         ("atr_multiplier", 2.0),  # ATR multiplier for stop calculation
         ("atr_stop_min_pct", 3.0),  # Minimum stop distance %
         ("atr_stop_max_pct", 15.0),  # Maximum stop distance %
+        ("max_price_extension_pct", 15.0),  # Skip buy if price > X% above SMA_20
+        ("cooldown_bars", 5),  # Wait N bars after exit before re-entering
+        ("max_trend_spread_pct", 20.0),  # Skip buy if SMA_20/SMA_50 spread > X%
     )
 
     def __init__(self):
@@ -86,6 +89,8 @@ class DecisionEngineStrategy(bt.Strategy):
         self._current_stop_price = None
         # Stored stop price for the current position (used for ATR-based exits)
         self._entry_stop_price = None
+        # Cooldown tracking — bar number of last exit
+        self._last_exit_bar = None
 
         # Trade history
         self.trade_records: List[TradeRecord] = []
@@ -186,6 +191,7 @@ class DecisionEngineStrategy(bt.Strategy):
                 self.total_cost = 0
                 self._current_stop_price = None
                 self._entry_stop_price = None
+                self._last_exit_bar = self.bar_count
 
         elif order.status in [order.Canceled, order.Margin, order.Rejected]:
             self.log(f"Order Canceled/Margin/Rejected: {order.status}")
@@ -428,6 +434,31 @@ class DecisionEngineStrategy(bt.Strategy):
                         self.current_trade.exit_reason = "Stop loss"
                     self.order = self.sell()
                     return
+
+        # Pre-buy filters (only apply when not in a position)
+        if self.position.size == 0:
+            # Filter 1: Price extension — skip if price too far above SMA_20
+            if hasattr(self.datas[0], "sma_20") and len(self.datas[0].sma_20) > 0:
+                sma20 = self.datas[0].sma_20[0]
+                if math.isfinite(sma20) and sma20 > 0:
+                    extension = (current_price - sma20) / sma20 * 100
+                    if extension > self.params.max_price_extension_pct:
+                        return  # Price too extended above SMA_20
+
+            # Filter 2: Cooldown — wait N bars after last exit
+            if self._last_exit_bar is not None and self.params.cooldown_bars > 0:
+                bars_since_exit = self.bar_count - self._last_exit_bar
+                if bars_since_exit < self.params.cooldown_bars:
+                    return  # Still in cooldown after last exit
+
+            # Filter 3: Trend maturity — skip if SMA_20/SMA_50 spread too wide
+            if hasattr(self.datas[0], "sma_50") and len(self.datas[0].sma_50) > 0:
+                sma50 = self.datas[0].sma_50[0]
+                if (math.isfinite(sma20) and sma20 > 0 and
+                        math.isfinite(sma50) and sma50 > 0):
+                    trend_spread = (sma20 - sma50) / sma50 * 100
+                    if trend_spread > self.params.max_trend_spread_pct:
+                        return  # Trend is late-stage, high reversion risk
 
         # Build context and evaluate rules
         context = self._build_context()
