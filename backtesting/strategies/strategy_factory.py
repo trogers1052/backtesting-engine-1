@@ -181,6 +181,10 @@ def create_strategy(
     allow_scale_in: bool = False,
     max_scale_ins: int = 2,
     scale_in_size: float = 0.5,
+    stop_mode: str = "fixed",
+    atr_multiplier: float = 2.0,
+    atr_stop_min_pct: float = 3.0,
+    atr_stop_max_pct: float = 15.0,
 ) -> Type[bt.Strategy]:
     """
     Create a backtrader Strategy class with decision-engine rules.
@@ -195,6 +199,10 @@ def create_strategy(
         allow_scale_in: Allow averaging down on deeper dips
         max_scale_ins: Maximum number of scale-ins per position
         scale_in_size: Scale-in size relative to initial position
+        stop_mode: "fixed" (% of entry) or "atr" (ATR-based)
+        atr_multiplier: ATR multiplier for stop calculation
+        atr_stop_min_pct: Minimum stop distance %
+        atr_stop_max_pct: Maximum stop distance %
 
     Returns:
         Configured DecisionEngineStrategy class
@@ -219,6 +227,10 @@ def create_strategy(
             ("allow_scale_in", allow_scale_in),
             ("max_scale_ins", max_scale_ins),
             ("scale_in_size", scale_in_size),
+            ("stop_mode", stop_mode),
+            ("atr_multiplier", atr_multiplier),
+            ("atr_stop_min_pct", atr_stop_min_pct),
+            ("atr_stop_max_pct", atr_stop_max_pct),
         )
 
     return ConfiguredStrategy

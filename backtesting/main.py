@@ -167,6 +167,40 @@ Examples:
         help="Scale-in size relative to initial position (default: 0.5 = half)",
     )
 
+    # Risk-based sizing arguments
+    parser.add_argument(
+        "--sizing-mode",
+        type=str,
+        choices=["percent", "risk_based"],
+        default=settings.default_sizing_mode,
+        help=f"Position sizing mode (default: {settings.default_sizing_mode})",
+    )
+    parser.add_argument(
+        "--risk-pct",
+        type=float,
+        default=settings.default_risk_pct,
+        help=f"Risk %% per trade for risk_based mode (default: {settings.default_risk_pct})",
+    )
+    parser.add_argument(
+        "--max-position-pct",
+        type=float,
+        default=settings.default_max_position_pct,
+        help=f"Max position %% for risk_based mode (default: {settings.default_max_position_pct})",
+    )
+    parser.add_argument(
+        "--stop-mode",
+        type=str,
+        choices=["fixed", "atr"],
+        default=settings.default_stop_mode,
+        help=f"Stop loss calculation mode (default: {settings.default_stop_mode})",
+    )
+    parser.add_argument(
+        "--atr-multiplier",
+        type=float,
+        default=settings.default_atr_multiplier,
+        help=f"ATR multiplier for stop calculation (default: {settings.default_atr_multiplier})",
+    )
+
     # Capital arguments
     parser.add_argument(
         "--cash",
@@ -273,6 +307,9 @@ Examples:
         initial_cash=args.cash,
         commission=args.commission,
         compound=compound,
+        sizing_mode=args.sizing_mode,
+        risk_pct=args.risk_pct,
+        max_position_pct=args.max_position_pct,
     )
 
     # Common run kwargs shared across single and multi-symbol backtests
@@ -287,6 +324,8 @@ Examples:
         allow_scale_in=args.allow_scale_in,
         max_scale_ins=args.max_scale_ins,
         scale_in_size=args.scale_in_size,
+        stop_mode=args.stop_mode,
+        atr_multiplier=args.atr_multiplier,
     )
 
     # Run backtest(s)

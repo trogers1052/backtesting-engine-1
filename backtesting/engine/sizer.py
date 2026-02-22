@@ -110,6 +110,72 @@ class FixedPercentSizer(bt.Sizer):
         return size
 
 
+class RiskBasedSizer(bt.Sizer):
+    """
+    Size positions based on risk per trade.
+
+    Calculates position size so that if the stop loss is hit, the maximum loss
+    equals risk_pct % of portfolio value. This matches production sizing logic.
+
+    The strategy must set self._current_stop_price before calling buy().
+    The sizer reads it via self.strategy._current_stop_price.
+
+    Parameters:
+        risk_pct: Max % of portfolio to risk per trade (default: 5%)
+        max_position_pct: Max % of portfolio in a single position (default: 20%)
+    """
+
+    params = (
+        ("risk_pct", 5.0),
+        ("max_position_pct", 20.0),
+    )
+
+    def _getsizing(self, comminfo, cash, data, isbuy):
+        if not isbuy:
+            position = self.broker.getposition(data)
+            return position.size
+
+        price = data.close[0]
+        if price <= 0:
+            return 0
+
+        # Read stop price from strategy bridge variable
+        stop_price = getattr(self.strategy, "_current_stop_price", None)
+
+        if stop_price is None or stop_price <= 0 or stop_price >= price:
+            # Fallback: use 95% of cash if no valid stop price
+            import logging
+            logging.getLogger(__name__).warning(
+                "RiskBasedSizer: no valid stop price on strategy, "
+                "falling back to 95%% of cash"
+            )
+            available = cash * 0.95
+            return int(available / price)
+
+        portfolio_value = self.broker.getvalue()
+        risk_per_share = price - stop_price
+
+        # Max shares by risk budget
+        max_dollar_risk = portfolio_value * (self.params.risk_pct / 100.0)
+        max_shares_by_risk = int(max_dollar_risk / risk_per_share)
+
+        # Max shares by position size limit
+        max_position_value = portfolio_value * (self.params.max_position_pct / 100.0)
+        max_shares_by_position = int(max_position_value / price)
+
+        # Take the minimum of risk and position limits
+        size = min(max_shares_by_risk, max_shares_by_position)
+
+        # Don't exceed available cash
+        max_shares_by_cash = int(cash * 0.99 / price)
+        size = min(size, max_shares_by_cash)
+
+        if size <= 0:
+            return 0
+
+        return size
+
+
 class FixedCashSizer(bt.Sizer):
     """
     Size positions with a fixed cash amount.

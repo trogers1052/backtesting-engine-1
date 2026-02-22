@@ -38,6 +38,13 @@ class Settings(BaseSettings):
 
     # Position sizing
     default_position_size_pct: float = 0.95  # Use 95% of available cash
+    default_sizing_mode: str = "percent"  # "percent" or "risk_based"
+    default_risk_pct: float = 5.0  # % of portfolio risked per trade
+    default_max_position_pct: float = 20.0  # Max % of portfolio in one position
+    default_stop_mode: str = "fixed"  # "fixed" or "atr"
+    default_atr_multiplier: float = 2.0  # ATR multiplier for stop calculation
+    default_atr_stop_min_pct: float = 3.0  # Minimum stop distance %
+    default_atr_stop_max_pct: float = 15.0  # Maximum stop distance %
 
     # Indicator periods (match analytics-service)
     rsi_period: int = 14
