@@ -448,7 +448,7 @@ class DecisionEngineStrategy(bt.Strategy):
             # Filter 2: Cooldown — wait N bars after last exit
             if self._last_exit_bar is not None and self.params.cooldown_bars > 0:
                 bars_since_exit = self.bar_count - self._last_exit_bar
-                if bars_since_exit < self.params.cooldown_bars:
+                if bars_since_exit <= self.params.cooldown_bars:
                     return  # Still in cooldown after last exit
 
             # Filter 3: Trend maturity — skip if SMA_20/SMA_50 spread too wide
