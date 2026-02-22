@@ -16,6 +16,17 @@ from ..config import settings
 
 logger = logging.getLogger(__name__)
 
+# Map CLI-friendly names to TimescaleDB time_bucket intervals
+TIMEFRAME_MAP = {
+    "1min": "1 minute",
+    "5min": "5 minutes",
+    "15min": "15 minutes",
+    "30min": "30 minutes",
+    "1hour": "1 hour",
+    "4hour": "4 hours",
+    "daily": "1 day",
+}
+
 
 class TimescaleLoader:
     """Load historical OHLCV data from TimescaleDB."""
@@ -54,6 +65,7 @@ class TimescaleLoader:
         symbol: str,
         start_date: date,
         end_date: Optional[date] = None,
+        timeframe: str = "daily",
     ) -> pd.DataFrame:
         """
         Load OHLCV data for a symbol.
@@ -62,6 +74,7 @@ class TimescaleLoader:
             symbol: Stock symbol (e.g., "WPM")
             start_date: Start date for data
             end_date: End date for data (default: today)
+            timeframe: Bar size — 1min, 5min, 15min, 30min, 1hour, 4hour, daily
 
         Returns:
             DataFrame with columns: datetime, open, high, low, close, volume
@@ -70,12 +83,19 @@ class TimescaleLoader:
         if end_date is None:
             end_date = date.today()
 
-        logger.info(f"Loading {symbol} data from {start_date} to {end_date}")
+        bucket = TIMEFRAME_MAP.get(timeframe)
+        if bucket is None:
+            raise ValueError(
+                f"Unknown timeframe '{timeframe}'. "
+                f"Valid options: {', '.join(TIMEFRAME_MAP.keys())}"
+            )
 
-        # Aggregate 1-minute bars to daily OHLCV
-        query = """
+        logger.info(f"Loading {symbol} data from {start_date} to {end_date} ({timeframe} bars)")
+
+        # Aggregate 1-minute bars to requested timeframe
+        query = f"""
             SELECT
-                time_bucket('1 day', time) as datetime,
+                time_bucket('{bucket}', time) as datetime,
                 (array_agg(open ORDER BY time ASC))[1] as open,
                 MAX(high) as high,
                 MIN(low) as low,
@@ -85,7 +105,7 @@ class TimescaleLoader:
             WHERE symbol = %s
               AND time >= %s
               AND time <= %s
-            GROUP BY time_bucket('1 day', time)
+            GROUP BY time_bucket('{bucket}', time)
             ORDER BY datetime ASC;
         """
 

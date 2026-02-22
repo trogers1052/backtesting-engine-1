@@ -117,6 +117,14 @@ Examples:
         help="End date (YYYY-MM-DD, default: today)",
     )
 
+    parser.add_argument(
+        "--timeframe",
+        type=str,
+        default=settings.default_timeframe,
+        choices=["1min", "5min", "15min", "30min", "1hour", "4hour", "daily"],
+        help=f"Bar timeframe (default: {settings.default_timeframe})",
+    )
+
     # Strategy arguments
     parser.add_argument(
         "--rules", "-r",
@@ -343,6 +351,7 @@ Examples:
     run_kwargs = dict(
         start_date=args.start,
         end_date=args.end,
+        timeframe=args.timeframe,
         rules=rules,
         min_confidence=args.min_confidence,
         profit_target=args.profit_target,

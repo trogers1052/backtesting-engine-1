@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     market_data_db_name: str = "stock_db"
 
     # Default backtest parameters
+    default_timeframe: str = "daily"  # 1min, 5min, 15min, 30min, 1hour, 4hour, daily
     default_start_date: str = "2021-01-01"
     default_end_date: Optional[str] = None  # None = today
 
