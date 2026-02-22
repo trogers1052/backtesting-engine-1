@@ -68,6 +68,7 @@ class DecisionEngineStrategy(bt.Strategy):
         ("cooldown_bars", 5),  # Wait N bars after exit before re-entering
         ("max_trend_spread_pct", 20.0),  # Skip buy if SMA_20/SMA_50 spread > X%
         ("max_loss_pct", 10.0),  # Force exit if trade down > X% (gap-down protection)
+        ("exit_timeframe", None),  # Intraday timeframe for multi-TF mode
     )
 
     def __init__(self):
@@ -93,6 +94,11 @@ class DecisionEngineStrategy(bt.Strategy):
         # Cooldown tracking — bar number of last exit
         self._last_exit_bar = None
 
+        # Multi-timeframe tracking
+        self._last_daily_len = 0  # Detect new daily bars via len(datas[1])
+        self._daily_bar_count = 0  # Count of daily bars for cooldown
+        self._last_exit_daily_bar = None  # Daily-bar cooldown in multi-TF mode
+
         # Trade history
         self.trade_records: List[TradeRecord] = []
         self.current_trade: Optional[TradeRecord] = None
@@ -105,9 +111,21 @@ class DecisionEngineStrategy(bt.Strategy):
         for rule in self.rules:
             logger.info(f"  - {rule.name}: {rule.description}")
 
+    def _is_multi_timeframe(self):
+        """True when running with dual data feeds (intraday + daily)."""
+        return len(self.datas) > 1 and self.params.exit_timeframe is not None
+
+    @property
+    def _daily_feed(self):
+        """Data feed for daily-scale indicators (SMAs, BB, ATR)."""
+        return self.datas[1] if self._is_multi_timeframe() else self.datas[0]
+
     def log(self, txt, dt=None):
         """Log a message with timestamp."""
-        dt = dt or self.datas[0].datetime.date(0)
+        if self._is_multi_timeframe():
+            dt = dt or self.datas[0].datetime.datetime(0)
+        else:
+            dt = dt or self.datas[0].datetime.date(0)
         if self.params.log_trades:
             logger.info(f"{dt.isoformat()} {txt}")
 
@@ -193,6 +211,7 @@ class DecisionEngineStrategy(bt.Strategy):
                 self._current_stop_price = None
                 self._entry_stop_price = None
                 self._last_exit_bar = self.bar_count
+                self._last_exit_daily_bar = self._daily_bar_count
 
         elif order.status in [order.Canceled, order.Margin, order.Rejected]:
             self.log(f"Order Canceled/Margin/Rejected: {order.status}")
@@ -206,87 +225,58 @@ class DecisionEngineStrategy(bt.Strategy):
 
         self.log(f"TRADE PROFIT: ${trade.pnl:.2f} ({trade.pnlcomm:.2f} after commission)")
 
+    def _read_indicator(self, feed, attr):
+        """Read a single indicator value from a data feed, or None if invalid."""
+        if hasattr(feed, attr) and len(getattr(feed, attr)) > 0:
+            val = getattr(feed, attr)[0]
+            if math.isfinite(val):
+                return val
+        return None
+
     def _build_context(self) -> SymbolContext:
-        """Build SymbolContext from current bar data."""
-        # Get indicator values from data feed lines
+        """Build SymbolContext from current bar data.
+
+        In multi-timeframe mode, merges indicators from two feeds:
+        - Daily feed (datas[1]): SMAs, BB bands, ATR, volume_sma_20
+        - Intraday feed (datas[0]): RSI, MACD, close, volume
+        """
         indicators = {}
+        daily = self._daily_feed
+        intraday = self.datas[0]
 
-        # Map data feed lines to indicator names
-        if hasattr(self.datas[0], "rsi_14") and len(self.datas[0].rsi_14) > 0:
-            val = self.datas[0].rsi_14[0]
-            if math.isfinite(val):
-                indicators["RSI_14"] = val
+        # --- Daily-scale indicators (from daily feed) ---
+        for attr, key in [
+            ("sma_20", "SMA_20"),
+            ("sma_50", "SMA_50"),
+            ("sma_200", "SMA_200"),
+            ("atr_14", "ATR_14"),
+            ("bb_lower", "BB_LOWER"),
+            ("bb_mid", "BB_MID"),
+            ("bb_upper", "BB_UPPER"),
+            ("bb_bandwidth", "BB_BANDWIDTH"),
+            ("bb_percent", "BB_PERCENT"),
+            ("volume_sma_20", "volume_sma_20"),
+        ]:
+            val = self._read_indicator(daily, attr)
+            if val is not None:
+                indicators[key] = val
 
-        if hasattr(self.datas[0], "sma_20") and len(self.datas[0].sma_20) > 0:
-            val = self.datas[0].sma_20[0]
-            if math.isfinite(val):
-                indicators["SMA_20"] = val
+        # --- Intraday/momentum indicators (from primary feed) ---
+        for attr, key in [
+            ("rsi_14", "RSI_14"),
+            ("macd", "MACD"),
+            ("macd_signal", "MACD_SIGNAL"),
+            ("macd_histogram", "MACD_HISTOGRAM"),
+        ]:
+            val = self._read_indicator(intraday, attr)
+            if val is not None:
+                indicators[key] = val
 
-        if hasattr(self.datas[0], "sma_50") and len(self.datas[0].sma_50) > 0:
-            val = self.datas[0].sma_50[0]
-            if math.isfinite(val):
-                indicators["SMA_50"] = val
-
-        if hasattr(self.datas[0], "sma_200") and len(self.datas[0].sma_200) > 0:
-            val = self.datas[0].sma_200[0]
-            if math.isfinite(val):
-                indicators["SMA_200"] = val
-
-        if hasattr(self.datas[0], "macd") and len(self.datas[0].macd) > 0:
-            val = self.datas[0].macd[0]
-            if math.isfinite(val):
-                indicators["MACD"] = val
-
-        if hasattr(self.datas[0], "macd_signal") and len(self.datas[0].macd_signal) > 0:
-            val = self.datas[0].macd_signal[0]
-            if math.isfinite(val):
-                indicators["MACD_SIGNAL"] = val
-
-        if hasattr(self.datas[0], "atr_14") and len(self.datas[0].atr_14) > 0:
-            val = self.datas[0].atr_14[0]
-            if math.isfinite(val):
-                indicators["ATR_14"] = val
-
-        if hasattr(self.datas[0], "macd_histogram") and len(self.datas[0].macd_histogram) > 0:
-            val = self.datas[0].macd_histogram[0]
-            if math.isfinite(val):
-                indicators["MACD_HISTOGRAM"] = val
-
-        if hasattr(self.datas[0], "bb_lower") and len(self.datas[0].bb_lower) > 0:
-            val = self.datas[0].bb_lower[0]
-            if math.isfinite(val):
-                indicators["BB_LOWER"] = val
-
-        if hasattr(self.datas[0], "bb_mid") and len(self.datas[0].bb_mid) > 0:
-            val = self.datas[0].bb_mid[0]
-            if math.isfinite(val):
-                indicators["BB_MID"] = val
-
-        if hasattr(self.datas[0], "bb_upper") and len(self.datas[0].bb_upper) > 0:
-            val = self.datas[0].bb_upper[0]
-            if math.isfinite(val):
-                indicators["BB_UPPER"] = val
-
-        if hasattr(self.datas[0], "bb_bandwidth") and len(self.datas[0].bb_bandwidth) > 0:
-            val = self.datas[0].bb_bandwidth[0]
-            if math.isfinite(val):
-                indicators["BB_BANDWIDTH"] = val
-
-        if hasattr(self.datas[0], "bb_percent") and len(self.datas[0].bb_percent) > 0:
-            val = self.datas[0].bb_percent[0]
-            if math.isfinite(val):
-                indicators["BB_PERCENT"] = val
-
-        # Add close and volume for enhanced rules
-        if len(self.datas[0].close) > 0:
-            indicators["close"] = self.datas[0].close[0]
-        if len(self.datas[0].volume) > 0:
-            indicators["volume"] = self.datas[0].volume[0]
-
-        if hasattr(self.datas[0], "volume_sma_20") and len(self.datas[0].volume_sma_20) > 0:
-            val = self.datas[0].volume_sma_20[0]
-            if math.isfinite(val):
-                indicators["volume_sma_20"] = val
+        # Close and volume always from primary (intraday) feed
+        if len(intraday.close) > 0:
+            indicators["close"] = intraday.close[0]
+        if len(intraday.volume) > 0:
+            indicators["volume"] = intraday.volume[0]
 
         # Current position
         position = None
@@ -313,15 +303,11 @@ class DecisionEngineStrategy(bt.Strategy):
 
         For ATR mode, matches production TradePlanEngine logic:
         stop = entry - (ATR * multiplier) with min/max % guards.
+        Uses daily ATR in multi-TF mode for proper daily-scale stops.
         """
         if self.params.stop_mode == "atr":
-            atr = None
-            if hasattr(self.datas[0], "atr_14") and len(self.datas[0].atr_14) > 0:
-                val = self.datas[0].atr_14[0]
-                if math.isfinite(val) and val > 0:
-                    atr = val
-
-            if atr is not None:
+            atr = self._read_indicator(self._daily_feed, "atr_14")
+            if atr is not None and atr > 0:
                 raw_stop = entry_price - (atr * self.params.atr_multiplier)
                 stop_pct = (entry_price - raw_stop) / entry_price * 100
 
@@ -393,8 +379,19 @@ class DecisionEngineStrategy(bt.Strategy):
         """Process each bar."""
         self.bar_count += 1
 
-        if self.bar_count <= self.params.warmup_bars:
-            return
+        # Track daily bar count for multi-TF cooldown
+        if self._is_multi_timeframe():
+            daily_len = len(self.datas[1])
+            if daily_len > self._last_daily_len:
+                self._daily_bar_count += (daily_len - self._last_daily_len)
+                self._last_daily_len = daily_len
+
+            # Warmup: wait for daily feed to have enough bars
+            if daily_len < self.params.warmup_bars:
+                return
+        else:
+            if self.bar_count <= self.params.warmup_bars:
+                return
 
         # Skip if we have a pending order
         if self.order:
@@ -450,28 +447,36 @@ class DecisionEngineStrategy(bt.Strategy):
 
         # Pre-buy filters (only apply when not in a position)
         if self.position.size == 0:
+            # Use daily feed for SMA-based filters
+            daily = self._daily_feed
+            sma20 = self._read_indicator(daily, "sma_20")
+
             # Filter 1: Price extension — skip if price too far above SMA_20
-            if hasattr(self.datas[0], "sma_20") and len(self.datas[0].sma_20) > 0:
-                sma20 = self.datas[0].sma_20[0]
-                if math.isfinite(sma20) and sma20 > 0:
-                    extension = (current_price - sma20) / sma20 * 100
-                    if extension > self.params.max_price_extension_pct:
-                        return  # Price too extended above SMA_20
+            if sma20 is not None and sma20 > 0:
+                extension = (current_price - sma20) / sma20 * 100
+                if extension > self.params.max_price_extension_pct:
+                    return  # Price too extended above SMA_20
 
             # Filter 2: Cooldown — wait N bars after last exit
-            if self._last_exit_bar is not None and self.params.cooldown_bars > 0:
-                bars_since_exit = self.bar_count - self._last_exit_bar
-                if bars_since_exit <= self.params.cooldown_bars:
-                    return  # Still in cooldown after last exit
+            if self._is_multi_timeframe():
+                # Cooldown in daily bars (not intraday bars)
+                if self._last_exit_daily_bar is not None and self.params.cooldown_bars > 0:
+                    daily_bars_since_exit = self._daily_bar_count - self._last_exit_daily_bar
+                    if daily_bars_since_exit <= self.params.cooldown_bars:
+                        return  # Still in cooldown after last exit
+            else:
+                if self._last_exit_bar is not None and self.params.cooldown_bars > 0:
+                    bars_since_exit = self.bar_count - self._last_exit_bar
+                    if bars_since_exit <= self.params.cooldown_bars:
+                        return  # Still in cooldown after last exit
 
             # Filter 3: Trend maturity — skip if SMA_20/SMA_50 spread too wide
-            if hasattr(self.datas[0], "sma_50") and len(self.datas[0].sma_50) > 0:
-                sma50 = self.datas[0].sma_50[0]
-                if (math.isfinite(sma20) and sma20 > 0 and
-                        math.isfinite(sma50) and sma50 > 0):
-                    trend_spread = (sma20 - sma50) / sma50 * 100
-                    if trend_spread > self.params.max_trend_spread_pct:
-                        return  # Trend is late-stage, high reversion risk
+            sma50 = self._read_indicator(daily, "sma_50")
+            if (sma20 is not None and sma20 > 0 and
+                    sma50 is not None and sma50 > 0):
+                trend_spread = (sma20 - sma50) / sma50 * 100
+                if trend_spread > self.params.max_trend_spread_pct:
+                    return  # Trend is late-stage, high reversion risk
 
         # Build context and evaluate rules
         context = self._build_context()

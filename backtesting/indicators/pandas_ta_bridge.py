@@ -101,9 +101,19 @@ def calculate_indicators(
     logger.debug("Calculating Volume SMA(20)")
     result["volume_sma_20"] = ta.sma(result["volume"].astype(float), length=20)
 
+    # Ensure all expected SMA columns exist (data feed compatibility)
+    # When sma_periods=[] (intraday feed), create NaN placeholders
+    for period in [20, 50, 200]:
+        if f"SMA_{period}" not in result.columns:
+            result[f"SMA_{period}"] = float("nan")
+
     # Drop rows with NaN indicators (warm-up period)
     initial_rows = len(result)
-    result = result.dropna(subset=[f"SMA_{max(sma_periods)}"])
+    if sma_periods:
+        result = result.dropna(subset=[f"SMA_{max(sma_periods)}"])
+    else:
+        # Intraday feed: drop based on RSI/MACD warmup instead
+        result = result.dropna(subset=[f"RSI_{rsi_period}"])
     dropped = initial_rows - len(result)
     if dropped > 0:
         logger.debug(f"Dropped {dropped} rows during indicator warm-up")

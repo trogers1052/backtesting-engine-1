@@ -27,6 +27,7 @@ class Settings(BaseSettings):
 
     # Default backtest parameters
     default_timeframe: str = "daily"  # 1min, 5min, 15min, 30min, 1hour, 4hour, daily
+    default_exit_timeframe: Optional[str] = None  # None = single-timeframe; "5min" enables multi-TF
     default_start_date: str = "2021-01-01"
     default_end_date: Optional[str] = None  # None = today
 
