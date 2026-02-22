@@ -221,6 +221,13 @@ Examples:
         help=f"Max SMA_20/SMA_50 spread %% (default: {settings.default_max_trend_spread_pct})",
     )
 
+    parser.add_argument(
+        "--max-loss",
+        type=float,
+        default=settings.default_max_loss_pct,
+        help=f"Max loss %% per trade before forced exit (default: {settings.default_max_loss_pct})",
+    )
+
     # Capital arguments
     parser.add_argument(
         "--cash",
@@ -349,6 +356,7 @@ Examples:
         max_price_extension_pct=args.max_extension,
         cooldown_bars=args.cooldown_bars,
         max_trend_spread_pct=args.max_trend_spread,
+        max_loss_pct=args.max_loss,
     )
 
     # Run backtest(s)
