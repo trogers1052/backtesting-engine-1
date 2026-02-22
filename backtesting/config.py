@@ -45,9 +45,9 @@ class Settings(BaseSettings):
     default_atr_multiplier: float = 2.0  # ATR multiplier for stop calculation
     default_atr_stop_min_pct: float = 3.0  # Minimum stop distance %
     default_atr_stop_max_pct: float = 15.0  # Maximum stop distance %
-    default_max_price_extension_pct: float = 10.0  # Skip buy if price > X% above SMA_20
+    default_max_price_extension_pct: float = 15.0  # Skip buy if price > X% above SMA_20
     default_cooldown_bars: int = 5  # Wait N bars after exit before re-entering
-    default_max_trend_spread_pct: float = 15.0  # Skip buy if SMA_20/SMA_50 spread > X%
+    default_max_trend_spread_pct: float = 20.0  # Skip buy if SMA_20/SMA_50 spread > X%
 
     # Indicator periods (match analytics-service)
     rsi_period: int = 14
