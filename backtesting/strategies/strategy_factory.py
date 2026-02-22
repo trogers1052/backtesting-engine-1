@@ -185,6 +185,9 @@ def create_strategy(
     atr_multiplier: float = 2.0,
     atr_stop_min_pct: float = 3.0,
     atr_stop_max_pct: float = 15.0,
+    max_price_extension_pct: float = 15.0,
+    cooldown_bars: int = 5,
+    max_trend_spread_pct: float = 20.0,
 ) -> Type[bt.Strategy]:
     """
     Create a backtrader Strategy class with decision-engine rules.
@@ -203,6 +206,9 @@ def create_strategy(
         atr_multiplier: ATR multiplier for stop calculation
         atr_stop_min_pct: Minimum stop distance %
         atr_stop_max_pct: Maximum stop distance %
+        max_price_extension_pct: Skip buy if price > X% above SMA_20
+        cooldown_bars: Wait N bars after exit before re-entering
+        max_trend_spread_pct: Skip buy if SMA_20/SMA_50 spread > X%
 
     Returns:
         Configured DecisionEngineStrategy class
@@ -231,6 +237,9 @@ def create_strategy(
             ("atr_multiplier", atr_multiplier),
             ("atr_stop_min_pct", atr_stop_min_pct),
             ("atr_stop_max_pct", atr_stop_max_pct),
+            ("max_price_extension_pct", max_price_extension_pct),
+            ("cooldown_bars", cooldown_bars),
+            ("max_trend_spread_pct", max_trend_spread_pct),
         )
 
     return ConfiguredStrategy

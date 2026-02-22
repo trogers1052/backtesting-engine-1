@@ -102,6 +102,9 @@ class BacktraderRunner:
         atr_multiplier: float = None,
         atr_stop_min_pct: float = None,
         atr_stop_max_pct: float = None,
+        max_price_extension_pct: float = None,
+        cooldown_bars: int = None,
+        max_trend_spread_pct: float = None,
     ) -> BacktestResult:
         """
         Run a backtest for a single symbol.
@@ -136,6 +139,9 @@ class BacktraderRunner:
         atr_multiplier = atr_multiplier if atr_multiplier is not None else settings.default_atr_multiplier
         atr_stop_min_pct = atr_stop_min_pct if atr_stop_min_pct is not None else settings.default_atr_stop_min_pct
         atr_stop_max_pct = atr_stop_max_pct if atr_stop_max_pct is not None else settings.default_atr_stop_max_pct
+        max_price_extension_pct = max_price_extension_pct if max_price_extension_pct is not None else settings.default_max_price_extension_pct
+        cooldown_bars = cooldown_bars if cooldown_bars is not None else settings.default_cooldown_bars
+        max_trend_spread_pct = max_trend_spread_pct if max_trend_spread_pct is not None else settings.default_max_trend_spread_pct
 
         logger.info(f"Running backtest for {symbol}")
         logger.info(f"  Period: {start_date} to {end_date}")
@@ -172,6 +178,9 @@ class BacktraderRunner:
             atr_multiplier=atr_multiplier,
             atr_stop_min_pct=atr_stop_min_pct,
             atr_stop_max_pct=atr_stop_max_pct,
+            max_price_extension_pct=max_price_extension_pct,
+            cooldown_bars=cooldown_bars,
+            max_trend_spread_pct=max_trend_spread_pct,
         )
         cerebro.addstrategy(strategy_class)
 
