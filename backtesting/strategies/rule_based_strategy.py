@@ -99,6 +99,9 @@ class DecisionEngineStrategy(bt.Strategy):
         self._daily_bar_count = 0  # Count of daily bars for cooldown
         self._last_exit_daily_bar = None  # Daily-bar cooldown in multi-TF mode
 
+        # Post-profit cooldown: consecutive profit target exits double cooldown
+        self._consecutive_profit_targets = 0
+
         # Trade history
         self.trade_records: List[TradeRecord] = []
         self.current_trade: Optional[TradeRecord] = None
@@ -200,6 +203,13 @@ class DecisionEngineStrategy(bt.Strategy):
                     self.current_trade.profit_pct = profit_pct
                     self.trade_records.append(self.current_trade)
                     self.current_trade = None
+
+                # Track consecutive profit target exits for extended cooldown
+                exit_reason = self.trade_records[-1].exit_reason if self.trade_records else None
+                if exit_reason == "Profit target":
+                    self._consecutive_profit_targets += 1
+                else:
+                    self._consecutive_profit_targets = 0
 
                 # Reset all position tracking
                 self.entry_price = None
@@ -457,17 +467,28 @@ class DecisionEngineStrategy(bt.Strategy):
                 if extension > self.params.max_price_extension_pct:
                     return  # Price too extended above SMA_20
 
+                # Filter 1b: Downside extension — skip if price >3% below SMA_20
+                # Buying below the moving average is catching a falling knife
+                if extension < -3.0:
+                    return  # Price too far below SMA_20, falling knife
+
             # Filter 2: Cooldown — wait N bars after last exit
+            # Double cooldown after 2+ consecutive profit targets to avoid
+            # re-entering at the top after a streak of wins
+            cooldown = self.params.cooldown_bars
+            if self._consecutive_profit_targets >= 2:
+                cooldown = cooldown * 2
+
             if self._is_multi_timeframe():
                 # Cooldown in daily bars (not intraday bars)
-                if self._last_exit_daily_bar is not None and self.params.cooldown_bars > 0:
+                if self._last_exit_daily_bar is not None and cooldown > 0:
                     daily_bars_since_exit = self._daily_bar_count - self._last_exit_daily_bar
-                    if daily_bars_since_exit <= self.params.cooldown_bars:
+                    if daily_bars_since_exit <= cooldown:
                         return  # Still in cooldown after last exit
             else:
-                if self._last_exit_bar is not None and self.params.cooldown_bars > 0:
+                if self._last_exit_bar is not None and cooldown > 0:
                     bars_since_exit = self.bar_count - self._last_exit_bar
-                    if bars_since_exit <= self.params.cooldown_bars:
+                    if bars_since_exit <= cooldown:
                         return  # Still in cooldown after last exit
 
             # Filter 3: Trend maturity — skip if SMA_20/SMA_50 spread too wide
