@@ -1,14 +1,15 @@
 # Backtesting Service Dependencies
+# Requires Python >= 3.12
 
 # Backtesting engine
 backtrader2>=1.9.76
 
 # Data processing
 pandas>=2.0.0
-numpy>=1.24.0,<2.0.0
+numpy>=1.24.0
 
-# Technical analysis
-ta>=0.10.0
+# Technical analysis (matches analytics-service)
+pandas_ta>=0.3.14b1
 
 # Database
 psycopg2-binary>=2.9.0
