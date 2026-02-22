@@ -105,6 +105,7 @@ class BacktraderRunner:
         max_price_extension_pct: float = None,
         cooldown_bars: int = None,
         max_trend_spread_pct: float = None,
+        max_loss_pct: float = None,
     ) -> BacktestResult:
         """
         Run a backtest for a single symbol.
@@ -142,6 +143,7 @@ class BacktraderRunner:
         max_price_extension_pct = max_price_extension_pct if max_price_extension_pct is not None else settings.default_max_price_extension_pct
         cooldown_bars = cooldown_bars if cooldown_bars is not None else settings.default_cooldown_bars
         max_trend_spread_pct = max_trend_spread_pct if max_trend_spread_pct is not None else settings.default_max_trend_spread_pct
+        max_loss_pct = max_loss_pct if max_loss_pct is not None else settings.default_max_loss_pct
 
         logger.info(f"Running backtest for {symbol}")
         logger.info(f"  Period: {start_date} to {end_date}")
@@ -181,6 +183,7 @@ class BacktraderRunner:
             max_price_extension_pct=max_price_extension_pct,
             cooldown_bars=cooldown_bars,
             max_trend_spread_pct=max_trend_spread_pct,
+            max_loss_pct=max_loss_pct,
         )
         cerebro.addstrategy(strategy_class)
 

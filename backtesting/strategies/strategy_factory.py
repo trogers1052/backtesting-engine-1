@@ -188,6 +188,7 @@ def create_strategy(
     max_price_extension_pct: float = 15.0,
     cooldown_bars: int = 5,
     max_trend_spread_pct: float = 20.0,
+    max_loss_pct: float = 10.0,
 ) -> Type[bt.Strategy]:
     """
     Create a backtrader Strategy class with decision-engine rules.
@@ -209,6 +210,7 @@ def create_strategy(
         max_price_extension_pct: Skip buy if price > X% above SMA_20
         cooldown_bars: Wait N bars after exit before re-entering
         max_trend_spread_pct: Skip buy if SMA_20/SMA_50 spread > X%
+        max_loss_pct: Force exit if trade down > X% (gap-down protection)
 
     Returns:
         Configured DecisionEngineStrategy class
@@ -240,6 +242,7 @@ def create_strategy(
             ("max_price_extension_pct", max_price_extension_pct),
             ("cooldown_bars", cooldown_bars),
             ("max_trend_spread_pct", max_trend_spread_pct),
+            ("max_loss_pct", max_loss_pct),
         )
 
     return ConfiguredStrategy

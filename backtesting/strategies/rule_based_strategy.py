@@ -67,6 +67,7 @@ class DecisionEngineStrategy(bt.Strategy):
         ("max_price_extension_pct", 15.0),  # Skip buy if price > X% above SMA_20
         ("cooldown_bars", 5),  # Wait N bars after exit before re-entering
         ("max_trend_spread_pct", 20.0),  # Skip buy if SMA_20/SMA_50 spread > X%
+        ("max_loss_pct", 10.0),  # Force exit if trade down > X% (gap-down protection)
     )
 
     def __init__(self):
@@ -434,6 +435,18 @@ class DecisionEngineStrategy(bt.Strategy):
                         self.current_trade.exit_reason = "Stop loss"
                     self.order = self.sell()
                     return
+
+            # Max loss cap — force exit if gap blew through stop
+            loss_pct = (cost_basis - current_price) / cost_basis * 100
+            if loss_pct >= self.params.max_loss_pct:
+                self.log(
+                    f"MAX LOSS CAP triggered @ ${current_price:.2f} "
+                    f"(-{loss_pct:.1f}% vs avg cost ${cost_basis:.2f}, cap: {self.params.max_loss_pct}%)"
+                )
+                if self.current_trade:
+                    self.current_trade.exit_reason = f"Max loss cap ({self.params.max_loss_pct}%)"
+                self.order = self.sell()
+                return
 
         # Pre-buy filters (only apply when not in a position)
         if self.position.size == 0:
