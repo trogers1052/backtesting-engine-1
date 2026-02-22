@@ -60,6 +60,10 @@ class DecisionEngineStrategy(bt.Strategy):
         ("max_scale_ins", 2),  # Max number of scale-ins
         ("scale_in_size", 0.5),  # Size of scale-in relative to initial (0.5 = half size)
         ("warmup_bars", 200),
+        ("stop_mode", "fixed"),  # "fixed" or "atr"
+        ("atr_multiplier", 2.0),  # ATR multiplier for stop calculation
+        ("atr_stop_min_pct", 3.0),  # Minimum stop distance %
+        ("atr_stop_max_pct", 15.0),  # Maximum stop distance %
     )
 
     def __init__(self):
@@ -77,6 +81,11 @@ class DecisionEngineStrategy(bt.Strategy):
         self.total_cost = 0  # Total cost basis
 
         self.bar_count = 0
+
+        # Bridge variable for RiskBasedSizer — set before buy(), read by sizer
+        self._current_stop_price = None
+        # Stored stop price for the current position (used for ATR-based exits)
+        self._entry_stop_price = None
 
         # Trade history
         self.trade_records: List[TradeRecord] = []
@@ -175,6 +184,8 @@ class DecisionEngineStrategy(bt.Strategy):
                 self.scale_in_count = 0
                 self.total_shares = 0
                 self.total_cost = 0
+                self._current_stop_price = None
+                self._entry_stop_price = None
 
         elif order.status in [order.Canceled, order.Margin, order.Rejected]:
             self.log(f"Order Canceled/Margin/Rejected: {order.status}")
@@ -290,6 +301,36 @@ class DecisionEngineStrategy(bt.Strategy):
             metadata=metadata,
         )
 
+    def _calculate_stop_price(self, entry_price: float) -> float:
+        """Calculate stop price based on stop_mode.
+
+        For ATR mode, matches production TradePlanEngine logic:
+        stop = entry - (ATR * multiplier) with min/max % guards.
+        """
+        if self.params.stop_mode == "atr":
+            atr = None
+            if hasattr(self.datas[0], "atr_14") and len(self.datas[0].atr_14) > 0:
+                val = self.datas[0].atr_14[0]
+                if math.isfinite(val) and val > 0:
+                    atr = val
+
+            if atr is not None:
+                raw_stop = entry_price - (atr * self.params.atr_multiplier)
+                stop_pct = (entry_price - raw_stop) / entry_price * 100
+
+                if stop_pct < self.params.atr_stop_min_pct:
+                    # Stop too tight — widen to min + 1%
+                    floor_pct = self.params.atr_stop_min_pct + 1.0
+                    raw_stop = entry_price * (1 - floor_pct / 100)
+                elif stop_pct > self.params.atr_stop_max_pct:
+                    # Stop too wide — cap to 10%
+                    raw_stop = entry_price * 0.90
+
+                return raw_stop
+
+        # Fixed mode (or ATR unavailable): use stop_loss param
+        return entry_price * (1 - self.params.stop_loss)
+
     def _evaluate_rules(self, context: SymbolContext) -> tuple:
         """
         Evaluate all rules and return aggregated signal.
@@ -367,13 +408,26 @@ class DecisionEngineStrategy(bt.Strategy):
                 self.order = self.sell()
                 return
 
-            # Check stop loss (based on average cost)
-            if current_price <= cost_basis * (1 - self.params.stop_loss):
-                self.log(f"STOP LOSS triggered @ ${current_price:.2f} (avg cost: ${cost_basis:.2f})")
-                if self.current_trade:
-                    self.current_trade.exit_reason = "Stop loss"
-                self.order = self.sell()
-                return
+            # Check stop loss
+            if self._entry_stop_price is not None:
+                # Use the ATR-based stop price calculated at entry
+                if current_price <= self._entry_stop_price:
+                    self.log(
+                        f"STOP LOSS triggered @ ${current_price:.2f} "
+                        f"(stop: ${self._entry_stop_price:.2f}, avg cost: ${cost_basis:.2f})"
+                    )
+                    if self.current_trade:
+                        self.current_trade.exit_reason = "Stop loss"
+                    self.order = self.sell()
+                    return
+            else:
+                # Fallback: fixed % stop from average cost
+                if current_price <= cost_basis * (1 - self.params.stop_loss):
+                    self.log(f"STOP LOSS triggered @ ${current_price:.2f} (avg cost: ${cost_basis:.2f})")
+                    if self.current_trade:
+                        self.current_trade.exit_reason = "Stop loss"
+                    self.order = self.sell()
+                    return
 
         # Build context and evaluate rules
         context = self._build_context()
@@ -386,6 +440,9 @@ class DecisionEngineStrategy(bt.Strategy):
                 self.entry_reason = reason
                 self.entry_confidence = confidence
                 self.entry_rules = rules
+                # Calculate stop price and set bridge variable for sizer
+                self._current_stop_price = self._calculate_stop_price(current_price)
+                self._entry_stop_price = self._current_stop_price
                 self.order = self.buy()
 
             # Scale-in (average down)

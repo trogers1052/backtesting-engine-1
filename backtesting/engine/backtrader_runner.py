@@ -17,7 +17,7 @@ from ..data import TimescaleLoader
 from ..indicators import calculate_indicators
 from ..strategies import DecisionEngineStrategy, create_strategy
 from .data_feed import create_data_feed
-from .sizer import PercentSizer, CompoundingSizer, FixedPercentSizer
+from .sizer import PercentSizer, CompoundingSizer, FixedPercentSizer, RiskBasedSizer
 
 logger = logging.getLogger(__name__)
 
@@ -71,11 +71,17 @@ class BacktraderRunner:
         initial_cash: float = None,
         commission: float = None,
         compound: bool = True,
+        sizing_mode: str = None,
+        risk_pct: float = None,
+        max_position_pct: float = None,
     ):
         """Initialize the runner."""
         self.initial_cash = initial_cash if initial_cash is not None else settings.default_initial_cash
         self.commission = commission if commission is not None else settings.default_commission
         self.compound = compound
+        self.sizing_mode = sizing_mode or settings.default_sizing_mode
+        self.risk_pct = risk_pct if risk_pct is not None else settings.default_risk_pct
+        self.max_position_pct = max_position_pct if max_position_pct is not None else settings.default_max_position_pct
         self.loader = TimescaleLoader()
 
     def run(
@@ -92,6 +98,10 @@ class BacktraderRunner:
         allow_scale_in: bool = False,
         max_scale_ins: int = 2,
         scale_in_size: float = 0.5,
+        stop_mode: str = None,
+        atr_multiplier: float = None,
+        atr_stop_min_pct: float = None,
+        atr_stop_max_pct: float = None,
     ) -> BacktestResult:
         """
         Run a backtest for a single symbol.
@@ -122,6 +132,10 @@ class BacktraderRunner:
         min_confidence = min_confidence if min_confidence is not None else settings.default_min_confidence
         profit_target = profit_target if profit_target is not None else settings.default_profit_target
         stop_loss = stop_loss if stop_loss is not None else settings.default_stop_loss
+        stop_mode = stop_mode or settings.default_stop_mode
+        atr_multiplier = atr_multiplier if atr_multiplier is not None else settings.default_atr_multiplier
+        atr_stop_min_pct = atr_stop_min_pct if atr_stop_min_pct is not None else settings.default_atr_stop_min_pct
+        atr_stop_max_pct = atr_stop_max_pct if atr_stop_max_pct is not None else settings.default_atr_stop_max_pct
 
         logger.info(f"Running backtest for {symbol}")
         logger.info(f"  Period: {start_date} to {end_date}")
@@ -154,6 +168,10 @@ class BacktraderRunner:
             allow_scale_in=allow_scale_in,
             max_scale_ins=max_scale_ins,
             scale_in_size=scale_in_size,
+            stop_mode=stop_mode,
+            atr_multiplier=atr_multiplier,
+            atr_stop_min_pct=atr_stop_min_pct,
+            atr_stop_max_pct=atr_stop_max_pct,
         )
         cerebro.addstrategy(strategy_class)
 
@@ -161,8 +179,18 @@ class BacktraderRunner:
         cerebro.broker.setcash(self.initial_cash)
         cerebro.broker.setcommission(commission=self.commission)
 
-        # Add sizer based on compounding preference
-        if self.compound:
+        # Add sizer based on sizing mode
+        if self.sizing_mode == "risk_based":
+            cerebro.addsizer(
+                RiskBasedSizer,
+                risk_pct=self.risk_pct,
+                max_position_pct=self.max_position_pct,
+            )
+            logger.info(
+                f"  Position sizing: Risk-based ({self.risk_pct}% risk, "
+                f"{self.max_position_pct}% max position, stop_mode={stop_mode})"
+            )
+        elif self.compound:
             cerebro.addsizer(CompoundingSizer, percents=95)
             logger.info("  Position sizing: Compounding (reinvesting profits)")
         else:
