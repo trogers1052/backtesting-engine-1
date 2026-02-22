@@ -107,6 +107,7 @@ class BacktraderRunner:
         cooldown_bars: int = None,
         max_trend_spread_pct: float = None,
         max_loss_pct: float = None,
+        exit_timeframe: str = None,
     ) -> BacktestResult:
         """
         Run a backtest for a single symbol.
@@ -124,6 +125,7 @@ class BacktraderRunner:
             allow_scale_in: Allow averaging down on deeper dips
             max_scale_ins: Maximum number of scale-ins per position
             scale_in_size: Scale-in size relative to initial position
+            exit_timeframe: Intraday timeframe for exits (enables multi-TF)
 
         Returns:
             BacktestResult with performance metrics
@@ -147,25 +149,54 @@ class BacktraderRunner:
         max_trend_spread_pct = max_trend_spread_pct if max_trend_spread_pct is not None else settings.default_max_trend_spread_pct
         max_loss_pct = max_loss_pct if max_loss_pct is not None else settings.default_max_loss_pct
 
+        # Resolve multi-timeframe mode
+        exit_timeframe = exit_timeframe or settings.default_exit_timeframe
+        multi_tf = exit_timeframe and exit_timeframe != timeframe
+
         logger.info(f"Running backtest for {symbol}")
         logger.info(f"  Period: {start_date} to {end_date}")
         logger.info(f"  Rules: {rules}")
-
-        # Load data
-        df = self.loader.load(symbol, start_date, end_date, timeframe=timeframe)
-        if df.empty:
-            raise ValueError(f"No data found for {symbol}")
-
-        # Calculate indicators
-        df = calculate_indicators(df)
-        logger.info(f"  Bars with indicators: {len(df)}")
+        if multi_tf:
+            logger.info(f"  Multi-timeframe: signals={timeframe}, execution={exit_timeframe}")
 
         # Create cerebro engine
         cerebro = bt.Cerebro()
 
-        # Add data feed
-        data = create_data_feed(df, name=symbol)
-        cerebro.adddata(data)
+        if multi_tf:
+            # --- Multi-timeframe: load daily + intraday data ---
+            df_daily = self.loader.load(symbol, start_date, end_date, timeframe=timeframe)
+            if df_daily.empty:
+                raise ValueError(f"No daily data found for {symbol}")
+
+            df_intraday = self.loader.load(symbol, start_date, end_date, timeframe=exit_timeframe)
+            if df_intraday.empty:
+                raise ValueError(f"No {exit_timeframe} data found for {symbol}")
+
+            # Full indicators on daily (SMAs, RSI, MACD, BB, ATR)
+            df_daily = calculate_indicators(df_daily)
+            # Oscillators only on intraday (RSI, MACD, BB, ATR — no SMAs)
+            df_intraday = calculate_indicators(df_intraday, sma_periods=[])
+
+            logger.info(f"  Daily bars: {len(df_daily)}, {exit_timeframe} bars: {len(df_intraday)}")
+
+            # Primary feed = intraday (next() fires every intraday bar)
+            data_intraday = create_data_feed(df_intraday, name=symbol)
+            cerebro.adddata(data_intraday)
+
+            # Secondary feed = daily (for indicator context)
+            data_daily = create_data_feed(df_daily, name=f"{symbol}_daily")
+            cerebro.adddata(data_daily)
+        else:
+            # --- Single-timeframe (existing behavior) ---
+            df = self.loader.load(symbol, start_date, end_date, timeframe=timeframe)
+            if df.empty:
+                raise ValueError(f"No data found for {symbol}")
+
+            df = calculate_indicators(df)
+            logger.info(f"  Bars with indicators: {len(df)}")
+
+            data = create_data_feed(df, name=symbol)
+            cerebro.adddata(data)
 
         # Create and add strategy
         strategy_class = create_strategy(
@@ -186,6 +217,7 @@ class BacktraderRunner:
             cooldown_bars=cooldown_bars,
             max_trend_spread_pct=max_trend_spread_pct,
             max_loss_pct=max_loss_pct,
+            exit_timeframe=exit_timeframe if multi_tf else None,
         )
         cerebro.addstrategy(strategy_class)
 

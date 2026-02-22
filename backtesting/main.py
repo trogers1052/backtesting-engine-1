@@ -124,6 +124,13 @@ Examples:
         choices=["1min", "5min", "15min", "30min", "1hour", "4hour", "daily"],
         help=f"Bar timeframe (default: {settings.default_timeframe})",
     )
+    parser.add_argument(
+        "--exit-timeframe",
+        type=str,
+        default=settings.default_exit_timeframe,
+        choices=["1min", "5min", "15min", "30min", "1hour"],
+        help="Intraday timeframe for exits/entries (enables multi-timeframe mode)",
+    )
 
     # Strategy arguments
     parser.add_argument(
@@ -366,6 +373,7 @@ Examples:
         cooldown_bars=args.cooldown_bars,
         max_trend_spread_pct=args.max_trend_spread,
         max_loss_pct=args.max_loss,
+        exit_timeframe=args.exit_timeframe,
     )
 
     # Run backtest(s)
