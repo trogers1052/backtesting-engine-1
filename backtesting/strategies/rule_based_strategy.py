@@ -510,6 +510,14 @@ class DecisionEngineStrategy(bt.Strategy):
                     self.order = self.buy(size=scale_size)
 
         elif signal_type == SignalType.SELL and self.position.size > 0:
+            # In multi-TF mode, skip rule-based sells on the entry day.
+            # Prevents noisy intraday entries from being immediately reversed
+            # by sell rules seeing the same daily context. Protective exits
+            # (stop loss, profit target, max loss cap) still fire same-day.
+            if self._is_multi_timeframe() and self.entry_date:
+                if self.datas[0].datetime.date(0) == self.entry_date.date():
+                    return  # Hold at least until next trading day
+
             if self.current_trade:
                 self.current_trade.exit_reason = reason
             self.order = self.sell()
