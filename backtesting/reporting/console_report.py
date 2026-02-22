@@ -67,9 +67,9 @@ def print_report(
     perf_table.add_row("Win Rate", f"[{win_color}]{result.win_rate:.1%}[/{win_color}]")
 
     if result.avg_win:
-        perf_table.add_row("Avg Win", f"[green]+{result.avg_win:.1%}[/green]")
+        perf_table.add_row("Avg Win", f"[green]+${result.avg_win:,.2f}[/green]")
     if result.avg_loss:
-        perf_table.add_row("Avg Loss", f"[red]{result.avg_loss:.1%}[/red]")
+        perf_table.add_row("Avg Loss", f"[red]-${abs(result.avg_loss):,.2f}[/red]")
 
     perf_table.add_row("", "")  # Spacer
 
