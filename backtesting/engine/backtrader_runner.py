@@ -89,6 +89,7 @@ class BacktraderRunner:
         symbol: str,
         start_date: date = None,
         end_date: date = None,
+        timeframe: str = None,
         rules: List[str] = None,
         min_confidence: float = None,
         profit_target: float = None,
@@ -132,6 +133,7 @@ class BacktraderRunner:
             settings.default_start_date, "%Y-%m-%d"
         ).date()
         end_date = end_date or date.today()
+        timeframe = timeframe or settings.default_timeframe
         rules = rules or ["buy_dip_in_uptrend"]
         min_confidence = min_confidence if min_confidence is not None else settings.default_min_confidence
         profit_target = profit_target if profit_target is not None else settings.default_profit_target
@@ -150,7 +152,7 @@ class BacktraderRunner:
         logger.info(f"  Rules: {rules}")
 
         # Load data
-        df = self.loader.load(symbol, start_date, end_date)
+        df = self.loader.load(symbol, start_date, end_date, timeframe=timeframe)
         if df.empty:
             raise ValueError(f"No data found for {symbol}")
 
