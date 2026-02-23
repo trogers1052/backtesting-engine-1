@@ -98,7 +98,6 @@ class DecisionEngineStrategy(bt.Strategy):
         self._last_daily_len = 0  # Detect new daily bars via len(datas[1])
         self._daily_bar_count = 0  # Count of daily bars for cooldown
         self._last_exit_daily_bar = None  # Daily-bar cooldown in multi-TF mode
-        self._new_daily_bar = False  # True on the first 5-min bar of a new day
 
         # Post-profit cooldown: consecutive profit target exits double cooldown
         self._consecutive_profit_targets = 0
@@ -247,14 +246,15 @@ class DecisionEngineStrategy(bt.Strategy):
     def _build_context(self) -> SymbolContext:
         """Build SymbolContext from current bar data.
 
-        In multi-timeframe mode, ALL indicators come from the daily feed.
-        Entry signals evaluate on daily bars only (daily RSI/MACD = meaningful).
-        The 5-min feed is only used for intraday exit price checks (not context).
+        In multi-timeframe mode, merges indicators from two feeds:
+        - Daily feed (datas[1]): SMAs, BB bands, ATR, volume_sma_20
+        - Intraday feed (datas[0]): RSI, MACD, close, volume
         """
         indicators = {}
         daily = self._daily_feed
+        intraday = self.datas[0]
 
-        # --- ALL indicators from daily feed ---
+        # --- Daily-scale indicators (from daily feed) ---
         for attr, key in [
             ("sma_20", "SMA_20"),
             ("sma_50", "SMA_50"),
@@ -266,20 +266,27 @@ class DecisionEngineStrategy(bt.Strategy):
             ("bb_bandwidth", "BB_BANDWIDTH"),
             ("bb_percent", "BB_PERCENT"),
             ("volume_sma_20", "volume_sma_20"),
-            ("rsi_14", "RSI_14"),
-            ("macd", "MACD"),
-            ("macd_signal", "MACD_SIGNAL"),
-            ("macd_histogram", "MACD_HISTOGRAM"),
         ]:
             val = self._read_indicator(daily, attr)
             if val is not None:
                 indicators[key] = val
 
-        # Close and volume from daily feed (rules see end-of-day values)
-        if len(daily.close) > 0:
-            indicators["close"] = daily.close[0]
-        if len(daily.volume) > 0:
-            indicators["volume"] = daily.volume[0]
+        # --- Intraday/momentum indicators (from primary feed) ---
+        for attr, key in [
+            ("rsi_14", "RSI_14"),
+            ("macd", "MACD"),
+            ("macd_signal", "MACD_SIGNAL"),
+            ("macd_histogram", "MACD_HISTOGRAM"),
+        ]:
+            val = self._read_indicator(intraday, attr)
+            if val is not None:
+                indicators[key] = val
+
+        # Close and volume always from primary (intraday) feed
+        if len(intraday.close) > 0:
+            indicators["close"] = intraday.close[0]
+        if len(intraday.volume) > 0:
+            indicators["volume"] = intraday.volume[0]
 
         # Current position
         position = None
@@ -379,23 +386,15 @@ class DecisionEngineStrategy(bt.Strategy):
         return (None, 0, None, [])
 
     def next(self):
-        """Process each bar.
-
-        In multi-TF mode: daily entries + 5-min exits.
-        - Every 5-min bar: check protective exits (profit target, stop loss, max loss)
-        - On new daily bar only: evaluate entry/sell rules using fully daily context
-        This gives daily-quality entry signals + 5-min exit precision.
-        """
+        """Process each bar."""
         self.bar_count += 1
 
         # Track daily bar count for multi-TF cooldown
-        self._new_daily_bar = False
         if self._is_multi_timeframe():
             daily_len = len(self.datas[1])
             if daily_len > self._last_daily_len:
                 self._daily_bar_count += (daily_len - self._last_daily_len)
                 self._last_daily_len = daily_len
-                self._new_daily_bar = True
 
             # Warmup: wait for daily feed to have enough bars
             if daily_len < self.params.warmup_bars:
@@ -413,7 +412,7 @@ class DecisionEngineStrategy(bt.Strategy):
         # Use average cost basis for exit calculations (if available)
         cost_basis = self.avg_cost_basis or self.entry_price
 
-        # === EXITS: Check every 5-min bar (intraday precision) ===
+        # Check exit conditions if in position
         if self.position.size > 0 and cost_basis:
             # Check profit target (based on average cost)
             if current_price >= cost_basis * (1 + self.params.profit_target):
@@ -455,13 +454,6 @@ class DecisionEngineStrategy(bt.Strategy):
                     self.current_trade.exit_reason = f"Max loss cap ({self.params.max_loss_pct}%)"
                 self.order = self.sell()
                 return
-
-        # === ENTRIES + RULE-BASED SELLS: Daily bars only in multi-TF ===
-        # In multi-TF mode, only evaluate rules when a new daily bar forms.
-        # This gives daily-quality signals (daily RSI/MACD are meaningful)
-        # while exits above still fire on every 5-min bar.
-        if self._is_multi_timeframe() and not self._new_daily_bar:
-            return  # Wait for next daily bar to evaluate rules
 
         # Pre-buy filters (only apply when not in a position)
         if self.position.size == 0:
@@ -507,7 +499,7 @@ class DecisionEngineStrategy(bt.Strategy):
                 if trend_spread > self.params.max_trend_spread_pct:
                     return  # Trend is late-stage, high reversion risk
 
-        # Build context and evaluate rules (all daily indicators)
+        # Build context and evaluate rules
         context = self._build_context()
         signal_type, confidence, reason, rules = self._evaluate_rules(context)
 
@@ -539,6 +531,14 @@ class DecisionEngineStrategy(bt.Strategy):
                     self.order = self.buy(size=scale_size)
 
         elif signal_type == SignalType.SELL and self.position.size > 0:
+            # In multi-TF mode, skip rule-based sells on the entry day.
+            # Prevents noisy intraday entries from being immediately reversed
+            # by sell rules seeing the same daily context. Protective exits
+            # (stop loss, profit target, max loss cap) still fire same-day.
+            if self._is_multi_timeframe() and self.entry_date:
+                if self.datas[0].datetime.date(0) == self.entry_date.date():
+                    return  # Hold at least until next trading day
+
             if self.current_trade:
                 self.current_trade.exit_reason = reason
             self.order = self.sell()
