@@ -77,9 +77,11 @@ def print_bootstrap_report(bootstrap_result: BootstrapResult):
     )
     console.print()
 
+    p_color = "green" if bootstrap_result.p_value < 0.05 else "red"
     console.print(
         f"  Trades: {bootstrap_result.n_trades}  |  "
-        f"Samples: {bootstrap_result.n_bootstrap:,}"
+        f"Samples: {bootstrap_result.n_bootstrap:,}  |  "
+        f"p-value: [{p_color}]{bootstrap_result.p_value:.4f}[/{p_color}]"
     )
     console.print()
 
@@ -156,7 +158,7 @@ def print_regime_report(regime_result: RegimeAnalysisResult):
     table.add_column("Sharpe", justify="right")
     table.add_column("Profit Factor", justify="right")
 
-    for regime_name in ["bull", "bear", "chop"]:
+    for regime_name in ["bull", "bear", "chop", "volatile", "crisis"]:
         if regime_name not in regime_result.regime_metrics:
             table.add_row(regime_name.upper(), "0", "-", "-", "-", "-", "-")
             continue

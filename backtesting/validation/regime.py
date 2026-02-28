@@ -54,16 +54,26 @@ class RegimeAnalysisResult:
 
 
 class RegimeClassifier:
-    """Classify market regimes using SPY price vs SMA_50/SMA_200."""
+    """Classify market regimes using SPY price vs SMA_50/SMA_200 + VIX thresholds."""
 
-    def __init__(self, loader: TimescaleLoader):
+    # VIX thresholds aligned with CLAUDE.md regime framework
+    VIX_VOLATILE = 25.0  # "Volatile Chop" — most signals disabled
+    VIX_CRISIS = 35.0  # "Crisis / Risk-Off" — defensive only, kill switch
+
+    def __init__(self, loader: TimescaleLoader, vix_symbol: str = "VIX"):
         self.loader = loader
+        self.vix_symbol = vix_symbol
         self._cache: Dict[str, pd.DataFrame] = {}
 
     def get_regimes(
         self, start_date: date, end_date: date
     ) -> pd.DataFrame:
-        """Load SPY data and classify each day as bull/bear/chop.
+        """Load SPY data and classify each day as bull/bear/chop/crisis.
+
+        Uses SPY SMA_50/SMA_200 for trend classification, then overlays
+        VIX thresholds when available:
+          - VIX > 35 → "crisis" (overrides all other regimes)
+          - VIX > 25 + not bull → "volatile" (high-vol chop)
 
         Returns DataFrame with datetime index and 'regime' column.
         """
@@ -79,6 +89,7 @@ class RegimeClassifier:
 
         df = calculate_indicators(df)
 
+        # Base classification from SPY trend structure
         conditions = [
             (df["close"] > df["SMA_200"]) & (df["SMA_50"] > df["SMA_200"]),
             (df["close"] < df["SMA_200"]) & (df["SMA_50"] < df["SMA_200"]),
@@ -86,9 +97,54 @@ class RegimeClassifier:
         choices = ["bull", "bear"]
         df["regime"] = np.select(conditions, choices, default="chop")
 
+        # Overlay VIX thresholds when data is available
+        df = self._apply_vix_overlay(df, start_date, end_date)
+
         result = df[["regime"]].copy()
         self._cache[cache_key] = result
         return result
+
+    def _apply_vix_overlay(
+        self, df: pd.DataFrame, start_date: date, end_date: date
+    ) -> pd.DataFrame:
+        """Refine regime classification using VIX fear gauge.
+
+        VIX > 35: crisis (overrides everything)
+        VIX > 25 and regime != bull: volatile
+        """
+        try:
+            vix_df = self.loader.load(
+                self.vix_symbol, start_date, end_date, timeframe="daily"
+            )
+        except Exception:
+            logger.debug(f"Could not load {self.vix_symbol} data, skipping VIX overlay")
+            return df
+
+        if vix_df.empty:
+            logger.debug(f"No {self.vix_symbol} data available, using SPY-only classification")
+            return df
+
+        # Align VIX close with SPY dates
+        vix_close = vix_df["close"].reindex(df.index, method="ffill")
+
+        # Crisis: VIX > 35 overrides all regimes
+        crisis_mask = vix_close > self.VIX_CRISIS
+        df.loc[crisis_mask, "regime"] = "crisis"
+
+        # Volatile: VIX > 25 but not crisis, and not already bull
+        volatile_mask = (
+            (vix_close > self.VIX_VOLATILE)
+            & ~crisis_mask
+            & (df["regime"] != "bull")
+        )
+        df.loc[volatile_mask, "regime"] = "volatile"
+
+        logger.info(
+            f"VIX overlay applied: {crisis_mask.sum()} crisis days, "
+            f"{volatile_mask.sum()} volatile days"
+        )
+
+        return df
 
 
 def _lookup_regime(regime_df: pd.DataFrame, entry_date) -> str:
@@ -135,11 +191,13 @@ def analyze_by_regime(
         backtest_result.end_date,
     )
 
-    # Group trades by regime
+    # Group trades by regime (includes VIX-derived regimes)
     trades_by_regime: Dict[str, list] = {
         "bull": [],
         "bear": [],
         "chop": [],
+        "volatile": [],
+        "crisis": [],
     }
 
     for trade in backtest_result.trades:

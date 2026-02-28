@@ -336,6 +336,18 @@ Examples:
         action="store_true",
         help="Analyze results by market regime (bull/bear/chop using SPY)",
     )
+    parser.add_argument(
+        "--embargo-days",
+        type=int,
+        default=5,
+        help="Gap days between train/test in walk-forward to prevent leakage (default: 5)",
+    )
+    parser.add_argument(
+        "--purge-days",
+        type=int,
+        default=10,
+        help="Days to trim from end of training to prevent trade overlap with test (default: 10)",
+    )
 
     args = parser.parse_args()
 
@@ -443,12 +455,16 @@ Examples:
                     wf_result = validator.validate_rolling(
                         symbols[0], args.start, args.end,
                         train_days=730, test_days=365, step_days=365,
+                        embargo_days=args.embargo_days,
+                        purge_days=args.purge_days,
                         **wf_kwargs,
                     )
                 else:
                     wf_result = validator.validate_simple(
                         symbols[0], args.start, args.end,
                         train_pct=args.train_pct,
+                        embargo_days=args.embargo_days,
+                        purge_days=args.purge_days,
                         **wf_kwargs,
                     )
                 print_walk_forward_report(wf_result)
