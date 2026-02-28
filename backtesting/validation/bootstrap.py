@@ -25,6 +25,9 @@ class BootstrapResult:
     win_rate_ci_lower: float
     win_rate_ci_upper: float
 
+    # p-value: fraction of bootstrap Sharpe samples <= 0
+    p_value: float = 0.0
+
     @property
     def no_edge_sharpe(self) -> bool:
         """95% CI includes 0 — no evidence of positive risk-adjusted return."""
@@ -103,22 +106,36 @@ def bootstrap_analysis(
         raise ValueError(f"Need at least 2 trades for bootstrap, got {len(trade_pnl)}")
 
     n_trades = len(trade_pnl)
+    trades_per_year = 52
 
     # Vectorized index generation — all bootstrap samples at once
     # Shape: (n_bootstrap, n_trades). Memory: ~2.4MB for 10k x 30
     random_indices = np.random.randint(0, n_trades, size=(n_bootstrap, n_trades))
     resampled_trades = trade_pnl[random_indices]
 
-    sharpe_samples = np.zeros(n_bootstrap)
-    win_rate_samples = np.zeros(n_bootstrap)
+    # Fully vectorized win rate: fraction of positive trades per sample
+    win_rate_samples = np.mean(resampled_trades > 0, axis=1)
 
-    for i in range(n_bootstrap):
-        sample = resampled_trades[i]
-        sharpe_samples[i] = calculate_trade_sharpe(sample, risk_free_rate)
-        win_rate_samples[i] = np.mean(sample > 0)
+    # Fully vectorized Sharpe: compute mean/std across all samples at once
+    returns = resampled_trades / 100.0
+    mean_returns = np.mean(returns, axis=1)
+    std_returns = np.std(returns, ddof=1, axis=1)
+    rf_per_trade = risk_free_rate / trades_per_year
+
+    # Replace zero std with 1.0 to avoid division warning; result masked to 0.0
+    safe_std = np.where(std_returns == 0, 1.0, std_returns)
+    sharpe_samples = np.where(
+        std_returns == 0,
+        0.0,
+        (mean_returns - rf_per_trade) / safe_std * np.sqrt(trades_per_year),
+    )
 
     sharpe_ci = np.percentile(sharpe_samples, [2.5, 97.5])
     wr_ci = np.percentile(win_rate_samples, [2.5, 97.5])
+
+    # p-value: fraction of bootstrap samples where Sharpe <= 0
+    # Tests null hypothesis that strategy has no positive risk-adjusted edge
+    p_value = float(np.mean(sharpe_samples <= 0))
 
     return BootstrapResult(
         symbol=backtest_result.symbol,
@@ -130,4 +147,5 @@ def bootstrap_analysis(
         win_rate_point=float(np.mean(trade_pnl > 0)),
         win_rate_ci_lower=float(wr_ci[0]),
         win_rate_ci_upper=float(wr_ci[1]),
+        p_value=p_value,
     )

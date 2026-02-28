@@ -68,6 +68,8 @@ class WalkForwardValidator:
         start_date: date,
         end_date: date,
         train_pct: float = 0.7,
+        embargo_days: int = 0,
+        purge_days: int = 0,
         **run_kwargs,
     ) -> WalkForwardResult:
         """Single train/test split by date.
@@ -77,18 +79,24 @@ class WalkForwardValidator:
             start_date: Full period start.
             end_date: Full period end.
             train_pct: Fraction of date range for training (default 0.7).
+            embargo_days: Gap between train and test to prevent leakage
+                from autocorrelated returns (default 0).
+            purge_days: Days to trim from end of training period so trades
+                opened near the boundary can't overlap with test (default 0).
             **run_kwargs: Passed through to BacktraderRunner.run().
 
         Returns:
             WalkForwardResult with one window.
         """
         total_days = (end_date - start_date).days
-        train_end = start_date + timedelta(days=int(total_days * train_pct))
-        test_start = train_end + timedelta(days=1)
+        split_date = start_date + timedelta(days=int(total_days * train_pct))
+        train_end = split_date - timedelta(days=purge_days)
+        test_start = split_date + timedelta(days=1 + embargo_days)
 
         logger.info(
             f"Walk-forward: train {start_date} to {train_end}, "
             f"test {test_start} to {end_date}"
+            + (f" (purge={purge_days}d, embargo={embargo_days}d)" if purge_days or embargo_days else "")
         )
 
         train_result = self.runner.run(
@@ -125,6 +133,8 @@ class WalkForwardValidator:
         train_days: int = 730,
         test_days: int = 365,
         step_days: int = 365,
+        embargo_days: int = 0,
+        purge_days: int = 0,
         **run_kwargs,
     ) -> WalkForwardResult:
         """Rolling walk-forward with multiple overlapping windows.
@@ -136,6 +146,10 @@ class WalkForwardValidator:
             train_days: Training window length in calendar days.
             test_days: Test window length in calendar days.
             step_days: Step forward between windows.
+            embargo_days: Gap between train and test to prevent leakage
+                from autocorrelated returns (default 0).
+            purge_days: Days to trim from end of training period so trades
+                opened near the boundary can't overlap with test (default 0).
             **run_kwargs: Passed through to BacktraderRunner.run().
 
         Returns:
@@ -146,8 +160,9 @@ class WalkForwardValidator:
         current_start = start_date
 
         while True:
-            train_end = current_start + timedelta(days=train_days)
-            test_start = train_end + timedelta(days=1)
+            split_date = current_start + timedelta(days=train_days)
+            train_end = split_date - timedelta(days=purge_days)
+            test_start = split_date + timedelta(days=1 + embargo_days)
             test_end = test_start + timedelta(days=test_days)
 
             if test_end > end_date:
@@ -157,6 +172,7 @@ class WalkForwardValidator:
                 f"Walk-forward window #{window_num}: "
                 f"train {current_start} to {train_end}, "
                 f"test {test_start} to {test_end}"
+                + (f" (purge={purge_days}d, embargo={embargo_days}d)" if purge_days or embargo_days else "")
             )
 
             train_result = self.runner.run(
