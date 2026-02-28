@@ -303,6 +303,40 @@ Examples:
         help="List symbols available in database",
     )
 
+    # Validation arguments
+    parser.add_argument(
+        "--walk-forward",
+        action="store_true",
+        help="Enable walk-forward validation (single symbol only)",
+    )
+    parser.add_argument(
+        "--train-pct",
+        type=float,
+        default=0.7,
+        help="Train split percentage for walk-forward (default: 0.7)",
+    )
+    parser.add_argument(
+        "--rolling-wf",
+        action="store_true",
+        help="Use rolling walk-forward with multiple windows",
+    )
+    parser.add_argument(
+        "--bootstrap",
+        action="store_true",
+        help="Run bootstrap significance tests on trade P&L",
+    )
+    parser.add_argument(
+        "--n-bootstrap",
+        type=int,
+        default=10000,
+        help="Number of bootstrap samples (default: 10000)",
+    )
+    parser.add_argument(
+        "--regime-analysis",
+        action="store_true",
+        help="Analyze results by market regime (bull/bear/chop using SPY)",
+    )
+
     args = parser.parse_args()
 
     # Handle info commands
@@ -393,6 +427,47 @@ Examples:
             if args.output:
                 export_json(result, args.output)
                 print(f"Results exported to {args.output}")
+
+            # Validation analyses (single symbol only)
+            if args.walk_forward:
+                from .validation import WalkForwardValidator
+                from .validation.report import print_walk_forward_report
+
+                # Strip date keys — walk-forward sets its own date ranges
+                wf_kwargs = {
+                    k: v for k, v in run_kwargs.items()
+                    if k not in ("start_date", "end_date")
+                }
+                validator = WalkForwardValidator(runner)
+                if args.rolling_wf:
+                    wf_result = validator.validate_rolling(
+                        symbols[0], args.start, args.end,
+                        train_days=730, test_days=365, step_days=365,
+                        **wf_kwargs,
+                    )
+                else:
+                    wf_result = validator.validate_simple(
+                        symbols[0], args.start, args.end,
+                        train_pct=args.train_pct,
+                        **wf_kwargs,
+                    )
+                print_walk_forward_report(wf_result)
+
+            if args.bootstrap and result.total_trades >= 2:
+                from .validation import bootstrap_analysis
+                from .validation.report import print_bootstrap_report
+
+                bs_result = bootstrap_analysis(
+                    result, n_bootstrap=args.n_bootstrap,
+                )
+                print_bootstrap_report(bs_result)
+
+            if args.regime_analysis:
+                from .validation import analyze_by_regime
+                from .validation.report import print_regime_report
+
+                regime_result = analyze_by_regime(result, runner.loader)
+                print_regime_report(regime_result)
 
         else:
             # Multiple symbols — run individually so we can check for
