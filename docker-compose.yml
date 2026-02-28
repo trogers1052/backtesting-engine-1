@@ -1,0 +1,44 @@
+services:
+  timescale:
+    image: timescale/timescaledb:latest-pg17
+    container_name: backtesting-timescale
+    restart: unless-stopped
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: ingestor
+      POSTGRES_PASSWORD: ingestor
+      POSTGRES_DB: stock_db
+      TS_TUNE_MEMORY: 4GB
+      TS_TUNE_NUM_CPUS: 4
+    volumes:
+      - timescale_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ingestor -d stock_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  market-data-ingestion:
+    image: market-data-ingestion:polygon
+    container_name: market-data-ingestion
+    restart: unless-stopped
+    depends_on:
+      timescale:
+        condition: service_healthy
+    environment:
+      POLYGON_API_KEY: ${POLYGON_API_KEY}
+      DB_HOST: timescale
+      DB_PORT: "5432"
+      DB_USER: ingestor
+      DB_PASSWORD: ingestor
+      DB_NAME: stock_db
+      KAFKA_ENABLED: "false"
+      WATCHLIST_SYNC_ENABLED: "false"
+      BACKFILL_MONTHS: "60"
+      POLL_INTERVAL_SECONDS: "60"
+      ENABLE_PRE_MARKET: "true"
+      ENABLE_AFTER_HOURS: "true"
+
+volumes:
+  timescale_data:

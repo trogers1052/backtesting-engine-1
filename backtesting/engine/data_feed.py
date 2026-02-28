@@ -32,6 +32,13 @@ class PandasDataWithIndicators(bt.feeds.PandasData):
         "bb_bandwidth",
         "bb_percent",
         "atr_14",
+        "stoch_k",
+        "stoch_d",
+        "adx_14",
+        "dmp_14",
+        "dmn_14",
+        "ema_9",
+        "ema_21",
         "volume_sma_20",
     )
 
@@ -58,6 +65,13 @@ class PandasDataWithIndicators(bt.feeds.PandasData):
         ("bb_bandwidth", "BB_BANDWIDTH"),
         ("bb_percent", "BB_PERCENT"),
         ("atr_14", "ATR_14"),
+        ("stoch_k", "STOCH_K"),
+        ("stoch_d", "STOCH_D"),
+        ("adx_14", "ADX_14"),
+        ("dmp_14", "DMP_14"),
+        ("dmn_14", "DMN_14"),
+        ("ema_9", "EMA_9"),
+        ("ema_21", "EMA_21"),
         ("volume_sma_20", "volume_sma_20"),
     )
 

@@ -349,6 +349,25 @@ Examples:
         help="Days to trim from end of training to prevent trade overlap with test (default: 10)",
     )
 
+    # Monte Carlo arguments
+    parser.add_argument(
+        "--monte-carlo",
+        action="store_true",
+        help="Run Monte Carlo simulation on trade P&L (path dependency + ruin probability)",
+    )
+    parser.add_argument(
+        "--mc-simulations",
+        type=int,
+        default=10000,
+        help="Number of Monte Carlo simulations (default: 10000)",
+    )
+    parser.add_argument(
+        "--mc-ruin-pct",
+        type=float,
+        default=0.5,
+        help="Ruin threshold as fraction of initial cash (default: 0.5 = 50%%)",
+    )
+
     args = parser.parse_args()
 
     # Handle info commands
@@ -484,6 +503,18 @@ Examples:
 
                 regime_result = analyze_by_regime(result, runner.loader)
                 print_regime_report(regime_result)
+
+            if args.monte_carlo and result.total_trades >= 2:
+                from .validation import monte_carlo_analysis
+                from .validation.report import print_monte_carlo_report
+
+                mc_result = monte_carlo_analysis(
+                    result,
+                    n_simulations=args.mc_simulations,
+                    initial_cash=args.cash,
+                    ruin_threshold_pct=args.mc_ruin_pct,
+                )
+                print_monte_carlo_report(mc_result)
 
         else:
             # Multiple symbols — run individually so we can check for
