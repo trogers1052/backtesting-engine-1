@@ -6,6 +6,7 @@ from datetime import date, timedelta
 from typing import List
 
 from ..engine.backtrader_runner import BacktraderRunner, BacktestResult
+from ..indicators.pandas_ta_bridge import get_required_warmup_bars
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +100,11 @@ class WalkForwardValidator:
             + (f" (purge={purge_days}d, embargo={embargo_days}d)" if purge_days or embargo_days else "")
         )
 
+        # Compute warm-up buffer so test windows have fully warmed indicators
+        warmup_bars = get_required_warmup_bars()
+        # ~1.5x calendar days per trading day to account for weekends/holidays
+        warmup_calendar_days = int(warmup_bars * 1.5)
+
         train_result = self.runner.run(
             symbol=symbol,
             start_date=start_date,
@@ -106,10 +112,12 @@ class WalkForwardValidator:
             **run_kwargs,
         )
 
+        test_warmup_start = test_start - timedelta(days=warmup_calendar_days)
         test_result = self.runner.run(
             symbol=symbol,
             start_date=test_start,
             end_date=end_date,
+            warmup_start=test_warmup_start,
             **run_kwargs,
         )
 
@@ -155,6 +163,10 @@ class WalkForwardValidator:
         Returns:
             WalkForwardResult with multiple windows.
         """
+        # Compute warm-up buffer so test windows have fully warmed indicators
+        warmup_bars = get_required_warmup_bars()
+        warmup_calendar_days = int(warmup_bars * 1.5)
+
         windows = []
         window_num = 1
         current_start = start_date
@@ -182,10 +194,12 @@ class WalkForwardValidator:
                 **run_kwargs,
             )
 
+            test_warmup_start = test_start - timedelta(days=warmup_calendar_days)
             test_result = self.runner.run(
                 symbol=symbol,
                 start_date=test_start,
                 end_date=test_end,
+                warmup_start=test_warmup_start,
                 **run_kwargs,
             )
 

@@ -108,6 +108,7 @@ class BacktraderRunner:
         max_trend_spread_pct: float = None,
         max_loss_pct: float = None,
         exit_timeframe: str = None,
+        warmup_start: date = None,
     ) -> BacktestResult:
         """
         Run a backtest for a single symbol.
@@ -126,6 +127,10 @@ class BacktraderRunner:
             max_scale_ins: Maximum number of scale-ins per position
             scale_in_size: Scale-in size relative to initial position
             exit_timeframe: Intraday timeframe for exits (enables multi-TF)
+            warmup_start: Load data from this date for indicator warm-up,
+                but only feed bars from start_date onward to the strategy.
+                Used by walk-forward validation so short test windows
+                have fully warmed indicators from day one.
 
         Returns:
             BacktestResult with performance metrics
@@ -162,13 +167,16 @@ class BacktraderRunner:
         # Create cerebro engine
         cerebro = bt.Cerebro()
 
+        # Determine the actual load start (may include warm-up buffer)
+        load_start = warmup_start if warmup_start and warmup_start < start_date else start_date
+
         if multi_tf:
             # --- Multi-timeframe: load daily + intraday data ---
-            df_daily = self.loader.load(symbol, start_date, end_date, timeframe=timeframe)
+            df_daily = self.loader.load(symbol, load_start, end_date, timeframe=timeframe)
             if df_daily.empty:
                 raise ValueError(f"No daily data found for {symbol}")
 
-            df_intraday = self.loader.load(symbol, start_date, end_date, timeframe=exit_timeframe)
+            df_intraday = self.loader.load(symbol, load_start, end_date, timeframe=exit_timeframe)
             if df_intraday.empty:
                 raise ValueError(f"No {exit_timeframe} data found for {symbol}")
 
@@ -176,6 +184,13 @@ class BacktraderRunner:
             df_daily = calculate_indicators(df_daily)
             # Oscillators only on intraday (RSI, MACD, BB, ATR — no SMAs)
             df_intraday = calculate_indicators(df_intraday, sma_periods=[])
+
+            # Trim warm-up bars — strategy only sees start_date onward
+            if load_start < start_date:
+                start_ts = pd.Timestamp(start_date, tz="UTC")
+                df_daily = df_daily[df_daily.index >= start_ts]
+                df_intraday = df_intraday[df_intraday.index >= start_ts]
+                logger.info(f"  Warm-up trimmed to {start_date}: {len(df_daily)} daily, {len(df_intraday)} intraday bars")
 
             logger.info(f"  Daily bars: {len(df_daily)}, {exit_timeframe} bars: {len(df_intraday)}")
 
@@ -188,11 +203,19 @@ class BacktraderRunner:
             cerebro.adddata(data_daily)
         else:
             # --- Single-timeframe (existing behavior) ---
-            df = self.loader.load(symbol, start_date, end_date, timeframe=timeframe)
+            df = self.loader.load(symbol, load_start, end_date, timeframe=timeframe)
             if df.empty:
                 raise ValueError(f"No data found for {symbol}")
 
             df = calculate_indicators(df)
+
+            # Trim warm-up bars — strategy only sees start_date onward
+            if load_start < start_date:
+                pre_trim = len(df)
+                start_ts = pd.Timestamp(start_date, tz="UTC")
+                df = df[df.index >= start_ts]
+                logger.info(f"  Warm-up: loaded from {load_start}, trimmed {pre_trim - len(df)} bars, {len(df)} bars remain")
+
             logger.info(f"  Bars with indicators: {len(df)}")
 
             data = create_data_feed(df, name=symbol)

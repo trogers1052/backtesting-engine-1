@@ -97,6 +97,46 @@ def calculate_indicators(
         length=atr_period,
     )
 
+    # Stochastic Oscillator (matches analytics-service: k=14, d=3, smooth_k=3)
+    logger.debug("Calculating Stochastic(14,3,3)")
+    stoch_df = ta.stoch(
+        high=result["high"],
+        low=result["low"],
+        close=result["close"],
+        k=14,
+        d=3,
+        smooth_k=3,
+    )
+    result["STOCH_K"] = stoch_df[
+        [c for c in stoch_df.columns if c.startswith("STOCHk_")][0]
+    ]
+    result["STOCH_D"] = stoch_df[
+        [c for c in stoch_df.columns if c.startswith("STOCHd_")][0]
+    ]
+
+    # ADX (matches analytics-service: period=14)
+    logger.debug("Calculating ADX(14)")
+    adx_df = ta.adx(
+        high=result["high"],
+        low=result["low"],
+        close=result["close"],
+        length=14,
+    )
+    result["ADX_14"] = adx_df[
+        [c for c in adx_df.columns if c.startswith("ADX_")][0]
+    ]
+    result["DMP_14"] = adx_df[
+        [c for c in adx_df.columns if c.startswith("DMP_")][0]
+    ]
+    result["DMN_14"] = adx_df[
+        [c for c in adx_df.columns if c.startswith("DMN_")][0]
+    ]
+
+    # EMAs (matches analytics-service: periods 9, 21)
+    for ema_period in [9, 21]:
+        logger.debug(f"Calculating EMA({ema_period})")
+        result[f"EMA_{ema_period}"] = ta.ema(result["close"], length=ema_period)
+
     # Volume SMA (for volume confirmation in enhanced rules)
     logger.debug("Calculating Volume SMA(20)")
     result["volume_sma_20"] = ta.sma(result["volume"].astype(float), length=20)

@@ -42,12 +42,20 @@ RULE_CONFIGS: Dict[str, Dict] = {
         "description": "Sell when RSI is overbought",
         "default_params": {"threshold": 70.0},
     },
+    "rsi_approaching_oversold": {
+        "description": "RSI approaching oversold territory",
+        "default_params": {},
+    },
     "macd_bullish_crossover": {
         "description": "Buy on MACD bullish crossover",
         "default_params": {},
     },
     "macd_bearish_crossover": {
         "description": "Sell on MACD bearish crossover",
+        "default_params": {},
+    },
+    "macd_momentum": {
+        "description": "MACD momentum signal",
         "default_params": {},
     },
     "weekly_uptrend": {
@@ -58,8 +66,29 @@ RULE_CONFIGS: Dict[str, Dict] = {
         "description": "Monthly uptrend (SMA_50 > SMA_200)",
         "default_params": {},
     },
+    "trend_alignment": {
+        "description": "Full bullish alignment: SMA_20 > SMA_50 > SMA_200",
+        "default_params": {},
+    },
+    "trend_break_warning": {
+        "description": "SMA_20 crosses below SMA_50 — uptrend may be ending",
+        "default_params": {},
+    },
     "golden_cross": {
         "description": "Full trend alignment (SMA_20 > SMA_50 > SMA_200)",
+        "default_params": {},
+    },
+    "death_cross": {
+        "description": "SMA_50 crosses below SMA_200 — bearish signal",
+        "default_params": {},
+    },
+    # Composite Rules
+    "rsi_macd_confluence": {
+        "description": "Buy on RSI + MACD confluence",
+        "default_params": {},
+    },
+    "dip_recovery": {
+        "description": "Buy when trend dip starts recovering",
         "default_params": {},
     },
     # Enhanced rules
@@ -149,8 +178,10 @@ def create_rules(rule_names: List[str], params: Dict[str, Dict] = None) -> List[
 
     for name in rule_names:
         if name not in RULE_REGISTRY:
-            logger.warning(f"Unknown rule: {name}, skipping")
-            continue
+            raise ValueError(
+                f"Unknown rule: '{name}'. "
+                f"Available rules: {sorted(RULE_REGISTRY.keys())}"
+            )
 
         # Get default params and merge with overrides
         rule_params = RULE_CONFIGS.get(name, {}).get("default_params", {}).copy()

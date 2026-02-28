@@ -5,6 +5,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from .bootstrap import BootstrapResult
+from .monte_carlo import MonteCarloResult
 from .regime import RegimeAnalysisResult
 from .walk_forward import WalkForwardResult
 
@@ -188,6 +189,103 @@ def print_regime_report(regime_result: RegimeAnalysisResult):
     else:
         console.print(
             "\n[bold green]Profit distributed across regimes[/bold green]"
+        )
+
+    console.print()
+
+
+def print_monte_carlo_report(mc_result: MonteCarloResult):
+    """Print Monte Carlo simulation results."""
+    console.print()
+    console.print(
+        Panel.fit(
+            f"[bold blue]Monte Carlo Simulation: {mc_result.symbol} "
+            f"({mc_result.n_simulations:,} paths)[/bold blue]",
+            border_style="blue",
+        )
+    )
+    console.print()
+
+    console.print(
+        f"  Trades: {mc_result.n_trades}  |  "
+        f"Initial: ${mc_result.initial_cash:,.2f}  |  "
+        f"Simulations: {mc_result.n_simulations:,}"
+    )
+    console.print()
+
+    table = Table(show_header=True, header_style="bold cyan")
+    table.add_column("Metric", style="bold")
+    table.add_column("Value", justify="right")
+
+    # Final equity distribution
+    table.add_row("Final Equity", "", end_section=True)
+    table.add_row("  5th percentile", f"${mc_result.equity_p5:,.2f}")
+    table.add_row("  25th percentile", f"${mc_result.equity_p25:,.2f}")
+    table.add_row(
+        "  Median",
+        f"[bold]${mc_result.equity_median:,.2f}[/bold]",
+    )
+    table.add_row("  75th percentile", f"${mc_result.equity_p75:,.2f}")
+    table.add_row(
+        "  95th percentile",
+        f"${mc_result.equity_p95:,.2f}",
+        end_section=True,
+    )
+
+    # Drawdown distribution
+    table.add_row("Max Drawdown", "", end_section=True)
+    dd_med_color = "green" if mc_result.drawdown_median < 20 else "yellow"
+    dd_95_color = "yellow" if mc_result.drawdown_p95 < 35 else "red"
+    dd_worst_color = "yellow" if mc_result.drawdown_worst < 50 else "red"
+    table.add_row(
+        "  Median",
+        f"[{dd_med_color}]-{mc_result.drawdown_median:.1f}%[/{dd_med_color}]",
+    )
+    table.add_row(
+        "  95th percentile",
+        f"[{dd_95_color}]-{mc_result.drawdown_p95:.1f}%[/{dd_95_color}]",
+    )
+    table.add_row(
+        "  Worst",
+        f"[{dd_worst_color}]-{mc_result.drawdown_worst:.1f}%[/{dd_worst_color}]",
+        end_section=True,
+    )
+
+    # Risk of ruin
+    ruin_pct = mc_result.ruin_probability * 100
+    if ruin_pct < 5:
+        ruin_color = "green"
+    elif ruin_pct < 15:
+        ruin_color = "yellow"
+    else:
+        ruin_color = "red"
+
+    table.add_row("Risk of Ruin", "", end_section=True)
+    table.add_row(
+        f"  P(equity < ${mc_result.ruin_threshold:,.0f})",
+        f"[{ruin_color}]{ruin_pct:.1f}%[/{ruin_color}]",
+    )
+    table.add_row(
+        "  Survival rate",
+        f"[{ruin_color}]{mc_result.survival_rate:.1%}[/{ruin_color}]",
+    )
+
+    console.print(table)
+
+    if ruin_pct < 5:
+        console.print(
+            f"\n[bold green]Strategy survives in {mc_result.survival_rate:.1%} "
+            f"of trade orderings[/bold green]"
+        )
+    elif ruin_pct < 15:
+        console.print(
+            f"\n[bold yellow]WARNING: {ruin_pct:.1f}% ruin probability — "
+            f"consider tighter stops or smaller position sizes[/bold yellow]"
+        )
+    else:
+        console.print(
+            f"\n[bold red]DANGER: {ruin_pct:.1f}% ruin probability — "
+            f"strategy is not safe for this account size[/bold red]"
         )
 
     console.print()
