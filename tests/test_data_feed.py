@@ -38,9 +38,9 @@ class TestPandasDataWithIndicatorsStructure:
             assert line in all_lines
 
     def test_total_line_count(self):
-        # 14 custom indicator lines + 7 base OHLCV lines = 21 total
+        # 21 custom indicator lines + 7 base OHLCV lines = 28 total
         all_lines = PandasDataWithIndicators.lines._getlines()
-        assert len(all_lines) == 21
+        assert len(all_lines) == 28
 
     def test_subclass_of_pandasdata(self):
         import backtrader as bt

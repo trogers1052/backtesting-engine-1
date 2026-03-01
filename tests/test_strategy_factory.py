@@ -150,9 +150,9 @@ class TestValidateRuleParams:
 
 
 class TestCreateRules:
-    def test_unknown_rule_skipped(self):
-        rules = create_rules(["nonexistent_rule_xyz"])
-        assert len(rules) == 0
+    def test_unknown_rule_raises(self):
+        with pytest.raises(ValueError, match="Unknown rule"):
+            create_rules(["nonexistent_rule_xyz"])
 
     def test_known_rule_created(self):
         rules = create_rules(["buy_dip_in_uptrend"])
@@ -167,9 +167,9 @@ class TestCreateRules:
         assert any("dip" in n for n in names_lower)
         assert any("rsi" in n for n in names_lower)
 
-    def test_mixed_known_unknown(self):
-        rules = create_rules(["buy_dip_in_uptrend", "does_not_exist"])
-        assert len(rules) == 1
+    def test_mixed_known_unknown_raises(self):
+        with pytest.raises(ValueError, match="Unknown rule"):
+            create_rules(["buy_dip_in_uptrend", "does_not_exist"])
 
     def test_param_override(self):
         rules = create_rules(
@@ -212,7 +212,7 @@ class TestCreateStrategy:
         assert strategy_class is not None
 
     def test_no_valid_rules_raises(self):
-        with pytest.raises(ValueError, match="No valid rules"):
+        with pytest.raises(ValueError, match="Unknown rule"):
             create_strategy(["nonexistent_xyz"])
 
     def test_custom_parameters_baked_in(self):
