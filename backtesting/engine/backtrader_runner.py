@@ -180,6 +180,13 @@ class BacktraderRunner:
             if df_intraday.empty:
                 raise ValueError(f"No {exit_timeframe} data found for {symbol}")
 
+            # Data integrity checks before indicator calculation
+            from ..validation.lookahead import run_integrity_checks
+            integrity = run_integrity_checks(df_daily, end_date=end_date, df_secondary=df_intraday)
+            if not integrity.all_passed:
+                failures = "; ".join(f.detail for f in integrity.failures)
+                raise ValueError(f"Data integrity check failed for {symbol}: {failures}")
+
             # Full indicators on daily (SMAs, RSI, MACD, BB, ATR)
             df_daily = calculate_indicators(df_daily)
             # Oscillators only on intraday (RSI, MACD, BB, ATR — no SMAs)
@@ -206,6 +213,13 @@ class BacktraderRunner:
             df = self.loader.load(symbol, load_start, end_date, timeframe=timeframe)
             if df.empty:
                 raise ValueError(f"No data found for {symbol}")
+
+            # Data integrity checks before indicator calculation
+            from ..validation.lookahead import run_integrity_checks
+            integrity = run_integrity_checks(df, end_date=end_date)
+            if not integrity.all_passed:
+                failures = "; ".join(f.detail for f in integrity.failures)
+                raise ValueError(f"Data integrity check failed for {symbol}: {failures}")
 
             df = calculate_indicators(df)
 
@@ -314,7 +328,7 @@ class BacktraderRunner:
         # Build trade list from strategy
         trades = []
         for trade in strategy.trade_records:
-            trades.append({
+            trade_dict = {
                 "entry_date": trade.entry_date.isoformat() if trade.entry_date else None,
                 "entry_price": trade.entry_price,
                 "entry_reason": trade.entry_reason,
@@ -324,7 +338,10 @@ class BacktraderRunner:
                 "exit_reason": trade.exit_reason,
                 "profit_pct": trade.profit_pct,
                 "rules_triggered": trade.rules_triggered,
-            })
+            }
+            if trade.scale_in_rules:
+                trade_dict["scale_in_rules"] = trade.scale_in_rules
+            trades.append(trade_dict)
 
         result = BacktestResult(
             symbol=symbol,

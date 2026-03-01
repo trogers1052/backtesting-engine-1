@@ -39,6 +39,7 @@ class TradeRecord:
     exit_reason: Optional[str] = None
     profit_pct: Optional[float] = None
     rules_triggered: List[str] = field(default_factory=list)
+    scale_in_rules: List[List[str]] = field(default_factory=list)
 
 
 class DecisionEngineStrategy(bt.Strategy):
@@ -151,6 +152,9 @@ class DecisionEngineStrategy(bt.Strategy):
 
                 if is_scale_in:
                     self.scale_in_count += 1
+                    # Track which rules triggered this scale-in
+                    if self.current_trade:
+                        self.current_trade.scale_in_rules.append(self.entry_rules.copy())
                     self.log(
                         f"SCALE-IN #{self.scale_in_count} @ ${executed_price:.2f} "
                         f"(avg cost: ${self.avg_cost_basis:.2f}, confidence: {self.entry_confidence:.2f})"

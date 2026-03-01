@@ -10,15 +10,21 @@ from unittest.mock import MagicMock
 
 import pytest
 
-# Mock pandas_ta before any backtesting imports (not available on Python <3.12)
+# Try to import real pandas_ta first; fall back to mock if unavailable
 if "pandas_ta" not in sys.modules:
-    _pta = types.ModuleType("pandas_ta")
-    _pta.rsi = MagicMock(return_value=None)
-    _pta.sma = MagicMock(return_value=None)
-    _pta.macd = MagicMock(return_value=None)
-    _pta.bbands = MagicMock(return_value=None)
-    _pta.atr = MagicMock(return_value=None)
-    sys.modules["pandas_ta"] = _pta
+    try:
+        import pandas_ta  # noqa: F401 — real import populates sys.modules
+    except ImportError:
+        _pta = types.ModuleType("pandas_ta")
+        _pta.rsi = MagicMock(return_value=None)
+        _pta.sma = MagicMock(return_value=None)
+        _pta.macd = MagicMock(return_value=None)
+        _pta.bbands = MagicMock(return_value=None)
+        _pta.atr = MagicMock(return_value=None)
+        _pta.stoch = MagicMock(return_value=None)
+        _pta.adx = MagicMock(return_value=None)
+        _pta.ema = MagicMock(return_value=None)
+        sys.modules["pandas_ta"] = _pta
 
 # Ensure decision-engine is importable
 de_path = os.environ.get(
