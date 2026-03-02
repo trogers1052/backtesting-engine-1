@@ -173,8 +173,8 @@ def print_regime_report(regime_result: RegimeAnalysisResult):
             regime_name.upper(),
             str(m.total_trades),
             f"[{wr_color}]{m.win_rate:.1%}[/{wr_color}]",
-            f"[{ret_color}]{m.avg_trade_return:+.2f}%[/{ret_color}]",
-            f"[{ret_color}]{m.total_return:+.1f}%[/{ret_color}]",
+            f"[{ret_color}]{m.avg_trade_return * 100:+.2f}%[/{ret_color}]",
+            f"[{ret_color}]{m.total_return * 100:+.1f}%[/{ret_color}]",
             f"{m.sharpe_ratio:.2f}",
             pf_str,
         )

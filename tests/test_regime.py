@@ -299,9 +299,9 @@ class TestAnalyzeByRegime:
         mock_calc.return_value = spy_df
 
         trades = [
-            {"entry_date": "2023-03-15", "profit_pct": 5.0},
-            {"entry_date": "2023-03-15", "profit_pct": 3.0},
-            {"entry_date": "2023-09-15", "profit_pct": -2.0},
+            {"entry_date": "2023-03-15", "profit_pct": 0.05},
+            {"entry_date": "2023-03-15", "profit_pct": 0.03},
+            {"entry_date": "2023-09-15", "profit_pct": -0.02},
         ]
         result = _make_result(trades)
         analysis = analyze_by_regime(result, mock_loader)
@@ -325,9 +325,9 @@ class TestAnalyzeByRegime:
         mock_calc.return_value = spy_df
 
         trades = [
-            {"entry_date": "2023-03-15", "profit_pct": 8.0},
-            {"entry_date": "2023-03-15", "profit_pct": -3.0},
-            {"entry_date": "2023-03-15", "profit_pct": 5.0},
+            {"entry_date": "2023-03-15", "profit_pct": 0.08},
+            {"entry_date": "2023-03-15", "profit_pct": -0.03},
+            {"entry_date": "2023-03-15", "profit_pct": 0.05},
         ]
         result = _make_result(trades)
         analysis = analyze_by_regime(result, mock_loader)
@@ -336,10 +336,10 @@ class TestAnalyzeByRegime:
         assert m.total_trades == 3
         assert m.winning_trades == 2
         assert abs(m.win_rate - 2 / 3) < 1e-9
-        assert abs(m.total_return - 10.0) < 1e-9
-        assert abs(m.avg_trade_return - 10.0 / 3) < 1e-9
-        # profit_factor = gross_profit / gross_loss = 13.0 / 3.0
-        assert abs(m.profit_factor - 13.0 / 3.0) < 0.01
+        assert abs(m.total_return - 0.10) < 1e-9
+        assert abs(m.avg_trade_return - 0.10 / 3) < 1e-9
+        # profit_factor = gross_profit / gross_loss = 0.13 / 0.03
+        assert abs(m.profit_factor - 0.13 / 0.03) < 0.01
 
     @patch("backtesting.validation.regime.calculate_indicators")
     def test_no_trades_returns_empty_metrics(self, mock_calc):
@@ -367,8 +367,8 @@ class TestAnalyzeByRegime:
         mock_calc.return_value = spy_df
 
         trades = [
-            {"entry_date": "2023-03-15", "profit_pct": 5.0},
-            {"profit_pct": 3.0},  # no entry_date
+            {"entry_date": "2023-03-15", "profit_pct": 0.05},
+            {"profit_pct": 0.03},  # no entry_date
         ]
         result = _make_result(trades)
         analysis = analyze_by_regime(result, mock_loader)
@@ -399,8 +399,8 @@ class TestAnalyzeByRegime:
         mock_calc.return_value = spy_df
 
         trades = [
-            {"entry_date": "2023-03-15", "profit_pct": -5.0},
-            {"entry_date": "2023-03-15", "profit_pct": -3.0},
+            {"entry_date": "2023-03-15", "profit_pct": -0.05},
+            {"entry_date": "2023-03-15", "profit_pct": -0.03},
         ]
         result = _make_result(trades)
         analysis = analyze_by_regime(result, mock_loader)
@@ -420,8 +420,8 @@ class TestAnalyzeByRegime:
         mock_calc.return_value = spy_df
 
         trades = [
-            {"entry_date": "2023-03-15", "profit_pct": 5.0},
-            {"entry_date": "2023-03-15", "profit_pct": 3.0},
+            {"entry_date": "2023-03-15", "profit_pct": 0.05},
+            {"entry_date": "2023-03-15", "profit_pct": 0.03},
         ]
         result = _make_result(trades)
         analysis = analyze_by_regime(result, mock_loader)
