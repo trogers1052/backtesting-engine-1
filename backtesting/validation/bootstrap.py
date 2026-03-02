@@ -48,11 +48,17 @@ def calculate_trade_sharpe(
     strategy edge for infrequent traders (15-40 trades over 5 years).
 
     Annualizes assuming ~52 trades/year (conservative weekly estimate).
+
+    Args:
+        trade_pnl_pct: Array of per-trade returns as decimal fractions
+            (e.g., 0.10 = 10% gain, -0.05 = 5% loss).
+        risk_free_rate: Annual risk-free rate as decimal (default 0.02 = 2%).
     """
     if len(trade_pnl_pct) < 2:
         return 0.0
 
-    returns = trade_pnl_pct / 100.0
+    # profit_pct is already a decimal fraction (0.10 = 10%)
+    returns = trade_pnl_pct
     trades_per_year = 52
 
     mean_return = np.mean(returns)
@@ -117,7 +123,8 @@ def bootstrap_analysis(
     win_rate_samples = np.mean(resampled_trades > 0, axis=1)
 
     # Fully vectorized Sharpe: compute mean/std across all samples at once
-    returns = resampled_trades / 100.0
+    # profit_pct is already a decimal fraction (0.10 = 10%)
+    returns = resampled_trades
     mean_returns = np.mean(returns, axis=1)
     std_returns = np.std(returns, ddof=1, axis=1)
     rf_per_trade = risk_free_rate / trades_per_year

@@ -44,7 +44,7 @@ def _make_result(trades, symbol="TEST"):
 
 class TestCalculateTradeSharpe:
     def test_fewer_than_2_trades(self):
-        assert calculate_trade_sharpe(np.array([5.0])) == 0.0
+        assert calculate_trade_sharpe(np.array([0.05])) == 0.0
         assert calculate_trade_sharpe(np.array([])) == 0.0
 
     def test_zero_std(self):
@@ -54,8 +54,9 @@ class TestCalculateTradeSharpe:
 
     def test_known_values(self):
         """Manually verify the Sharpe formula."""
-        pnl = np.array([10.0, -2.0, 8.0, -1.0, 6.0])
-        returns = pnl / 100.0  # [0.10, -0.02, 0.08, -0.01, 0.06]
+        # profit_pct values as decimal fractions (0.10 = 10%)
+        pnl = np.array([0.10, -0.02, 0.08, -0.01, 0.06])
+        returns = pnl  # already decimal fractions
         rf_per_trade = 0.02 / 52
 
         mean_ret = np.mean(returns)
@@ -67,13 +68,13 @@ class TestCalculateTradeSharpe:
 
     def test_negative_returns_negative_sharpe(self):
         """Mostly losing trades → negative Sharpe."""
-        pnl = np.array([-5.0, -3.0, -8.0, 1.0, -6.0])
+        pnl = np.array([-0.05, -0.03, -0.08, 0.01, -0.06])
         result = calculate_trade_sharpe(pnl)
         assert result < 0
 
     def test_positive_returns_positive_sharpe(self):
         """Mostly winning trades → positive Sharpe."""
-        pnl = np.array([5.0, 3.0, 8.0, -1.0, 6.0])
+        pnl = np.array([0.05, 0.03, 0.08, -0.01, 0.06])
         result = calculate_trade_sharpe(pnl)
         assert result > 0
 
@@ -124,7 +125,7 @@ class TestBootstrapResultProperties:
 
 class TestBootstrapAnalysis:
     def test_fewer_than_2_trades_raises(self):
-        result = _make_result([{"profit_pct": 5.0}])
+        result = _make_result([{"profit_pct": 0.05}])
         with pytest.raises(ValueError, match="at least 2 trades"):
             bootstrap_analysis(result)
 
@@ -134,7 +135,7 @@ class TestBootstrapAnalysis:
             bootstrap_analysis(result)
 
     def test_reproducibility_with_seed(self):
-        trades = [{"profit_pct": p} for p in [5.0, -2.0, 8.0, -1.0, 6.0, 3.0]]
+        trades = [{"profit_pct": p} for p in [0.05, -0.02, 0.08, -0.01, 0.06, 0.03]]
         result = _make_result(trades)
 
         r1 = bootstrap_analysis(result, n_bootstrap=500, random_seed=42)
@@ -147,8 +148,8 @@ class TestBootstrapAnalysis:
     def test_strong_edge_significant(self):
         """Many winning trades → CI should not include zero/50%."""
         trades = [{"profit_pct": p} for p in
-                  [8.0, 6.0, 10.0, 7.0, 5.0, 9.0, 4.0, 11.0, 6.0, 8.0,
-                   7.0, 5.0, 9.0, 12.0, 6.0, 8.0, 10.0, 7.0, 5.0, 9.0]]
+                  [0.08, 0.06, 0.10, 0.07, 0.05, 0.09, 0.04, 0.11, 0.06, 0.08,
+                   0.07, 0.05, 0.09, 0.12, 0.06, 0.08, 0.10, 0.07, 0.05, 0.09]]
         result = _make_result(trades)
         r = bootstrap_analysis(result, n_bootstrap=5000, random_seed=42)
 
@@ -158,7 +159,7 @@ class TestBootstrapAnalysis:
     def test_random_trades_no_edge(self):
         """50/50 win/loss of similar magnitude → likely no significant edge."""
         np.random.seed(99)
-        pnls = np.random.normal(0, 5, 30).tolist()
+        pnls = np.random.normal(0, 0.05, 30).tolist()
         trades = [{"profit_pct": p} for p in pnls]
         result = _make_result(trades)
         r = bootstrap_analysis(result, n_bootstrap=5000, random_seed=42)
@@ -169,10 +170,10 @@ class TestBootstrapAnalysis:
     def test_none_profit_pct_filtered(self):
         """Trades with None profit_pct should be skipped."""
         trades = [
-            {"profit_pct": 5.0},
+            {"profit_pct": 0.05},
             {"profit_pct": None},
-            {"profit_pct": 3.0},
-            {"profit_pct": -2.0},
+            {"profit_pct": 0.03},
+            {"profit_pct": -0.02},
         ]
         result = _make_result(trades)
         r = bootstrap_analysis(result, n_bootstrap=100, random_seed=42)
@@ -180,7 +181,7 @@ class TestBootstrapAnalysis:
 
     def test_ci_bounds_ordering(self):
         """Lower CI < point estimate < upper CI (approximately)."""
-        trades = [{"profit_pct": p} for p in [5.0, -2.0, 8.0, -1.0, 6.0, 3.0]]
+        trades = [{"profit_pct": p} for p in [0.05, -0.02, 0.08, -0.01, 0.06, 0.03]]
         result = _make_result(trades)
         r = bootstrap_analysis(result, n_bootstrap=5000, random_seed=42)
 
@@ -188,13 +189,13 @@ class TestBootstrapAnalysis:
         assert r.win_rate_ci_lower <= r.win_rate_ci_upper
 
     def test_symbol_propagated(self):
-        trades = [{"profit_pct": p} for p in [5.0, -2.0, 8.0]]
+        trades = [{"profit_pct": p} for p in [0.05, -0.02, 0.08]]
         result = _make_result(trades, symbol="PPLT")
         r = bootstrap_analysis(result, n_bootstrap=100, random_seed=42)
         assert r.symbol == "PPLT"
 
     def test_n_bootstrap_propagated(self):
-        trades = [{"profit_pct": p} for p in [5.0, -2.0, 8.0]]
+        trades = [{"profit_pct": p} for p in [0.05, -0.02, 0.08]]
         result = _make_result(trades)
         r = bootstrap_analysis(result, n_bootstrap=200, random_seed=42)
         assert r.n_bootstrap == 200
@@ -202,8 +203,8 @@ class TestBootstrapAnalysis:
     def test_p_value_strong_edge_below_005(self):
         """Strong positive edge → p-value should be well below 0.05."""
         trades = [{"profit_pct": p} for p in
-                  [8.0, 6.0, 10.0, 7.0, 5.0, 9.0, 4.0, 11.0, 6.0, 8.0,
-                   7.0, 5.0, 9.0, 12.0, 6.0, 8.0, 10.0, 7.0, 5.0, 9.0]]
+                  [0.08, 0.06, 0.10, 0.07, 0.05, 0.09, 0.04, 0.11, 0.06, 0.08,
+                   0.07, 0.05, 0.09, 0.12, 0.06, 0.08, 0.10, 0.07, 0.05, 0.09]]
         result = _make_result(trades)
         r = bootstrap_analysis(result, n_bootstrap=5000, random_seed=42)
 
@@ -212,7 +213,7 @@ class TestBootstrapAnalysis:
     def test_p_value_no_edge_above_005(self):
         """Random noise around zero → p-value should be above 0.05."""
         np.random.seed(99)
-        pnls = np.random.normal(0, 5, 30).tolist()
+        pnls = np.random.normal(0, 0.05, 30).tolist()
         trades = [{"profit_pct": p} for p in pnls]
         result = _make_result(trades)
         r = bootstrap_analysis(result, n_bootstrap=5000, random_seed=42)
@@ -221,7 +222,7 @@ class TestBootstrapAnalysis:
 
     def test_p_value_between_0_and_1(self):
         """p-value must always be in [0, 1]."""
-        trades = [{"profit_pct": p} for p in [5.0, -2.0, 8.0, -1.0, 6.0]]
+        trades = [{"profit_pct": p} for p in [0.05, -0.02, 0.08, -0.01, 0.06]]
         result = _make_result(trades)
         r = bootstrap_analysis(result, n_bootstrap=1000, random_seed=42)
 
@@ -229,7 +230,7 @@ class TestBootstrapAnalysis:
 
     def test_p_value_reproducible_with_seed(self):
         """Same seed → same p-value."""
-        trades = [{"profit_pct": p} for p in [5.0, -2.0, 8.0, -1.0, 6.0, 3.0]]
+        trades = [{"profit_pct": p} for p in [0.05, -0.02, 0.08, -0.01, 0.06, 0.03]]
         result = _make_result(trades)
 
         r1 = bootstrap_analysis(result, n_bootstrap=500, random_seed=42)
@@ -249,7 +250,7 @@ class TestBootstrapAnalysis:
     def test_vectorized_no_warnings(self):
         """Vectorized bootstrap should not emit divide-by-zero warnings."""
         import warnings
-        trades = [{"profit_pct": p} for p in [5.0, 5.0, 5.0]]
+        trades = [{"profit_pct": p} for p in [0.05, 0.05, 0.05]]
         result = _make_result(trades)
         with warnings.catch_warnings():
             warnings.simplefilter("error")
@@ -257,11 +258,11 @@ class TestBootstrapAnalysis:
 
     def test_vectorized_matches_scalar(self):
         """Vectorized Sharpe results should match the scalar function."""
-        trades = [{"profit_pct": p} for p in [5.0, -2.0, 8.0, -1.0, 6.0, 3.0]]
+        trades = [{"profit_pct": p} for p in [0.05, -0.02, 0.08, -0.01, 0.06, 0.03]]
         result = _make_result(trades)
         r = bootstrap_analysis(result, n_bootstrap=500, random_seed=42)
 
         # Point estimate should match direct call
-        trade_pnl = np.array([5.0, -2.0, 8.0, -1.0, 6.0, 3.0])
+        trade_pnl = np.array([0.05, -0.02, 0.08, -0.01, 0.06, 0.03])
         expected_sharpe = calculate_trade_sharpe(trade_pnl)
         assert abs(r.sharpe_point - expected_sharpe) < 1e-9

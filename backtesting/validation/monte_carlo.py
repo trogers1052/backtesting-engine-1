@@ -91,9 +91,9 @@ def monte_carlo_analysis(
     n_trades = len(trade_pnl)
     ruin_threshold = initial_cash * ruin_threshold_pct
 
-    # Convert P&L percentages to return multipliers
-    # e.g. +7% → 1.07, -5% → 0.95
-    multipliers = 1.0 + trade_pnl / 100.0
+    # Convert P&L decimal fractions to return multipliers
+    # e.g. +0.07 (7%) → 1.07, -0.05 (5% loss) → 0.95
+    multipliers = 1.0 + trade_pnl
 
     # Generate permutation indices: vectorized shuffle
     # For each simulation row, argsort of random values gives a permutation

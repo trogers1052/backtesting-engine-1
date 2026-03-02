@@ -216,12 +216,18 @@ def check_multiframe_alignment(
     return IntegrityCheck(name=name, passed=True)
 
 
-def check_price_sanity(df: pd.DataFrame) -> IntegrityCheck:
+def check_price_sanity(
+    df: pd.DataFrame, max_single_bar_pct: float = 0.75,
+) -> IntegrityCheck:
     """Detect obviously corrupt price data.
 
-    Catches zero/negative prices, extreme single-bar moves (>50%),
+    Catches zero/negative prices, extreme single-bar moves (default >75%),
     and close prices outside high/low range — all signs of bad data
     that would make backtest results meaningless.
+
+    Note: threshold raised from 50% to 75% because real catalysts
+    (government contracts, FDA approvals, trade policy) can move
+    small/mid-cap stocks 50-60% in a single session with legitimate volume.
     """
     name = "price_sanity"
 
@@ -246,15 +252,15 @@ def check_price_sanity(df: pd.DataFrame) -> IntegrityCheck:
         if below_low > 0:
             problems.append(f"{below_low} bars where close < low")
 
-    # Check for extreme single-bar moves (>50%)
+    # Check for extreme single-bar moves (>75% default)
     if "close" in df.columns and len(df) > 1:
         pct_change = df["close"].pct_change().abs()
-        extreme = (pct_change > 0.5).sum()
+        extreme = (pct_change > max_single_bar_pct).sum()
         if extreme > 0:
             worst_idx = pct_change.idxmax()
             worst_val = pct_change.max()
             problems.append(
-                f"{extreme} bar(s) with >50% move, worst: {worst_val:.1%} at {worst_idx}"
+                f"{extreme} bar(s) with >{max_single_bar_pct:.0%} move, worst: {worst_val:.1%} at {worst_idx}"
             )
 
     if problems:
