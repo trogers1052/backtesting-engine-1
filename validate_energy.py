@@ -88,6 +88,31 @@ SYMBOL_INFO = {
         "description": "Midstream MLP — pipelines, terminals, natural gas processing",
         "tier": "Large-cap midstream",
     },
+    "COP": {
+        "name": "ConocoPhillips",
+        "description": "Independent E&P — Permian, Eagle Ford, Bakken, Alaska, global LNG",
+        "tier": "Large-cap E&P",
+    },
+    "CNQ": {
+        "name": "Canadian Natural Resources",
+        "description": "Canadian oil sands, heavy oil, conventional E&P, natural gas",
+        "tier": "Large-cap Canadian E&P",
+    },
+    "EQNR": {
+        "name": "Equinor",
+        "description": "Norwegian state oil company — North Sea, offshore wind, LNG",
+        "tier": "Large-cap international oil",
+    },
+    "EOG": {
+        "name": "EOG Resources",
+        "description": "Premium US shale E&P — Eagle Ford, Permian, Powder River Basin",
+        "tier": "Large-cap E&P",
+    },
+    "GUSH": {
+        "name": "Direxion Daily S&P Oil & Gas Bull 2X",
+        "description": "2x leveraged oil & gas ETF — daily rebalancing, volatility decay",
+        "tier": "Leveraged energy ETF",
+    },
 }
 
 # General rules (no mining-specific rules like miner_metal_ratio)
