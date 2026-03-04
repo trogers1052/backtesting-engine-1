@@ -4,7 +4,7 @@
 **Period:** 2021-01-01 to 2026-02-28
 **Initial Cash:** $1,000
 **Timeframe:** Daily-only screening + multi-TF re-validation
-**Validation Runtime:** 12.5 minutes
+**Validation Runtime:** 21.6 minutes
 **Category:** Large-cap E&P
 
 ---
@@ -34,30 +34,32 @@ EOG — Premium US shale E&P — Eagle Ford, Permian, Powder River Basin. Large-
 | Alt A: Full general rules (10 rules, 10%/5%) | 22 | 27.3% | -26.9% | -0.63 | 0.61 | -42.1% |
 | Alt B: Tighter stops (3 rules, 10%/4%) | 12 | 8.3% | -31.7% | -0.75 | 0.22 | -39.4% |
 | Alt C: Wider PT (3 rules, 12%/5%) | 11 | 9.1% | -37.9% | -0.76 | 0.29 | -46.9% |
-| Alt D: Energy-extended rules (12 rules, 10%/5%) | 22 | 27.3% | -26.9% | -0.63 | 0.61 | -42.1% |
+| Alt D: Energy rules (14 rules, 10%/5%) | 34 | 26.5% | -33.6% | -0.53 | 0.62 | -50.2% |
+| Alt E: upstream sector rules (3 rules, 10%/5%) | 20 | 25.0% | -40.0% | -0.87 | 0.32 | -47.5% |
+| Alt F: upstream rules wider stops (10%/6%) | 20 | 25.0% | -46.6% | -0.91 | 0.29 | -53.2% |
 
-**Best baseline selected for validation: Alt A: Full general rules (10 rules, 10%/5%)**
+**Best baseline selected for validation: Alt D: Energy rules (14 rules, 10%/5%)**
 
 ---
 
 ## 2. Full Validation
 
-### Alt A: Full general rules (10 rules, 10%/5%)
+### Alt D: Energy rules (14 rules, 10%/5%)
 
-- **Rules:** `enhanced_buy_dip, momentum_reversal, trend_continuation, rsi_oversold, macd_bearish_crossover, trend_alignment, golden_cross, trend_break_warning, death_cross, seasonality`
+- **Rules:** `enhanced_buy_dip, momentum_reversal, trend_continuation, rsi_oversold, macd_bearish_crossover, trend_alignment, golden_cross, trend_break_warning, death_cross, seasonality, energy_momentum, energy_mean_reversion, energy_seasonality, midstream_yield_reversion`
 - **Profit Target:** 10%
 - **Min Confidence:** 0.5
 - **Max Loss:** 5.0%
 - **Cooldown:** 3 bars
 
-**Performance:** Return=-26.9%, Trades=22, WR=27.3%, Sharpe=-0.63, PF=0.61, DD=-42.1%
+**Performance:** Return=-33.6%, Trades=34, WR=26.5%, Sharpe=-0.53, PF=0.62, DD=-50.2%
 
 | Gate | Status | Detail |
 |------|--------|--------|
-| Walk-Forward | FAIL | Train Sharpe=-0.69, Test Sharpe=0.00, Ratio=0% (need >=50%) |
-| Bootstrap | FAIL | p=0.7925, Sharpe CI=[-5.90, 1.67], WR CI=[9.1%, 45.5%] |
-| Monte Carlo | FAIL | Ruin=0.8%, P95 DD=-48.0%, Median equity=$724, Survival=99.2% |
-| Regime | FAIL | bull:15t/-22.4%, bear:3t/-15.7%, chop:2t/-10.8%, volatile:2t/+22.2% |
+| Walk-Forward | FAIL | Train Sharpe=-0.85, Test Sharpe=-0.02, Ratio=0% (need >=50%) |
+| Bootstrap | FAIL | p=0.8197, Sharpe CI=[-4.35, 1.25], WR CI=[14.7%, 44.1%] |
+| Monte Carlo | FAIL | Ruin=6.5%, P95 DD=-55.9%, Median equity=$655, Survival=93.5% |
+| Regime | FAIL | bull:23t/-28.2%, bear:3t/-15.7%, chop:5t/-7.9%, volatile:3t/+17.3% |
 
 **Result: 0/4 gates passed**
 
@@ -69,83 +71,85 @@ EOG — Premium US shale E&P — Eagle Ford, Permian, Powder River Basin. Large-
 
 | Config | Trades | Win Rate | Return | Sharpe |
 |--------|--------|----------|--------|--------|
-| WF tune: PT=8% | 21 | 28.6% | -25.9% | -0.53 |
-| WF tune: PT=12% | 13 | 15.4% | -27.6% | -0.58 |
-| WF tune: PT=15% | 11 | 9.1% | -28.3% | -0.59 |
-| MC tune: max_loss=3.0% | 31 | 19.4% | -30.3% | -0.60 |
-| MC tune: max_loss=4.0% | 22 | 18.2% | -35.2% | -0.63 |
-| WF tune: conf=0.45 | 22 | 27.3% | -26.9% | -0.63 |
-| BS tune: conf=0.4 | 22 | 27.3% | -26.9% | -0.63 |
+| MC tune: ATR stops x2.0 | 36 | 25.0% | -31.0% | -0.49 |
+| WF tune: ATR stops x2.5 | 34 | 26.5% | -32.2% | -0.52 |
+| WF tune: conf=0.45 | 34 | 26.5% | -33.6% | -0.53 |
+| BS tune: conf=0.4 | 34 | 26.5% | -33.6% | -0.53 |
+| BS tune: energy rules (14) | 34 | 26.5% | -33.6% | -0.53 |
+| WF tune: PT=8% | 33 | 27.3% | -35.3% | -0.56 |
+| WF tune: PT=15% | 23 | 17.4% | -36.9% | -0.58 |
+| WF tune: PT=12% | 25 | 20.0% | -37.0% | -0.58 |
 | BS tune: full rules (10) | 22 | 27.3% | -26.9% | -0.63 |
-| BS tune: energy rules (12) | 22 | 27.3% | -26.9% | -0.63 |
-| BS tune: + volume_breakout | 22 | 27.3% | -26.9% | -0.63 |
-| BS tune: + commodity_breakout | 22 | 27.3% | -26.9% | -0.63 |
-| Regime tune: + dollar_weakness | 22 | 27.3% | -26.9% | -0.63 |
-| WF tune: cooldown=7 | 17 | 11.8% | -46.3% | -0.81 |
-| WF tune: conf=0.65 | 10 | 10.0% | -29.7% | -1.11 |
-| WF tune: conf=0.6 | 15 | 13.3% | -37.2% | -1.13 |
-| WF tune: conf=0.55 | 17 | 17.6% | -39.3% | -1.15 |
+| MC tune: max_loss=4.0% | 35 | 20.0% | -44.5% | -0.70 |
+| MC tune: max_loss=3.0% | 46 | 19.6% | -40.1% | -0.74 |
+| WF tune: cooldown=7 | 25 | 24.0% | -45.0% | -0.76 |
+| BS tune: sector-specific rules | 23 | 17.4% | -44.5% | -0.76 |
+| WF tune: conf=0.6 | 29 | 20.7% | -46.6% | -0.79 |
+| WF tune: conf=0.65 | 20 | 20.0% | -37.2% | -0.80 |
+| WF tune: conf=0.55 | 29 | 20.7% | -46.9% | -0.80 |
 
 ### Full Validation of Top Candidates
 
-### WF tune: PT=8%
+### MC tune: ATR stops x2.0
 
-- **Rules:** `enhanced_buy_dip, momentum_reversal, trend_continuation, rsi_oversold, macd_bearish_crossover, trend_alignment, golden_cross, trend_break_warning, death_cross, seasonality`
-- **Profit Target:** 8%
+- **Rules:** `enhanced_buy_dip, momentum_reversal, trend_continuation, rsi_oversold, macd_bearish_crossover, trend_alignment, golden_cross, trend_break_warning, death_cross, seasonality, energy_momentum, energy_mean_reversion, energy_seasonality, midstream_yield_reversion`
+- **Profit Target:** 10%
 - **Min Confidence:** 0.5
 - **Max Loss:** 5.0%
 - **Cooldown:** 3 bars
+- **Stop Mode:** ATR x2.0
 
-**Performance:** Return=-25.9%, Trades=21, WR=28.6%, Sharpe=-0.53, PF=0.60, DD=-38.4%
+**Performance:** Return=-31.0%, Trades=36, WR=25.0%, Sharpe=-0.49, PF=0.64, DD=-47.9%
 
 | Gate | Status | Detail |
 |------|--------|--------|
-| Walk-Forward | FAIL | Train Sharpe=-0.50, Test Sharpe=0.00, Ratio=0% (need >=50%) |
-| Bootstrap | FAIL | p=0.8082, Sharpe CI=[-6.20, 1.70], WR CI=[9.5%, 47.6%] |
-| Monte Carlo | FAIL | Ruin=0.1%, P95 DD=-45.2%, Median equity=$737, Survival=99.9% |
-| Regime | FAIL | bull:15t/-26.3%, bear:2t/-8.4%, chop:2t/-10.8%, volatile:2t/+19.8% |
+| Walk-Forward | FAIL | Train Sharpe=-0.77, Test Sharpe=0.02, Ratio=0% (need >=50%) |
+| Bootstrap | FAIL | p=0.7992, Sharpe CI=[-4.19, 1.32], WR CI=[13.9%, 41.7%] |
+| Monte Carlo | FAIL | Ruin=3.8%, P95 DD=-53.9%, Median equity=$683, Survival=96.2% |
+| Regime | FAIL | bull:25t/-24.5%, bear:3t/-15.7%, chop:5t/-7.9%, volatile:3t/+17.3% |
 
 **Result: 0/4 gates passed**
 
 ---
 
-### WF tune: PT=12%
+### WF tune: ATR stops x2.5
 
-- **Rules:** `enhanced_buy_dip, momentum_reversal, trend_continuation, rsi_oversold, macd_bearish_crossover, trend_alignment, golden_cross, trend_break_warning, death_cross, seasonality`
-- **Profit Target:** 12%
+- **Rules:** `enhanced_buy_dip, momentum_reversal, trend_continuation, rsi_oversold, macd_bearish_crossover, trend_alignment, golden_cross, trend_break_warning, death_cross, seasonality, energy_momentum, energy_mean_reversion, energy_seasonality, midstream_yield_reversion`
+- **Profit Target:** 10%
 - **Min Confidence:** 0.5
 - **Max Loss:** 5.0%
 - **Cooldown:** 3 bars
+- **Stop Mode:** ATR x2.5
 
-**Performance:** Return=-27.6%, Trades=13, WR=15.4%, Sharpe=-0.58, PF=0.44, DD=-39.4%
+**Performance:** Return=-32.2%, Trades=34, WR=26.5%, Sharpe=-0.52, PF=0.63, DD=-49.0%
 
 | Gate | Status | Detail |
 |------|--------|--------|
-| Walk-Forward | FAIL | Train Sharpe=-0.59, Test Sharpe=0.00, Ratio=0% (need >=50%) |
-| Bootstrap | FAIL | p=0.8815, Sharpe CI=[-30.69, 1.35], WR CI=[0.0%, 38.5%] |
-| Monte Carlo | FAIL | Ruin=0.0%, P95 DD=-43.9%, Median equity=$696, Survival=100.0% |
-| Regime | FAIL | bull:9t/-35.0%, bear:2t/-8.3%, chop:1t/-7.0%, volatile:1t/+18.1% |
+| Walk-Forward | FAIL | Train Sharpe=-0.85, Test Sharpe=0.06, Ratio=0% (need >=50%) |
+| Bootstrap | FAIL | p=0.8035, Sharpe CI=[-4.25, 1.32], WR CI=[14.7%, 44.1%] |
+| Monte Carlo | FAIL | Ruin=5.0%, P95 DD=-54.9%, Median equity=$673, Survival=95.0% |
+| Regime | FAIL | bull:23t/-25.7%, bear:3t/-15.7%, chop:5t/-7.9%, volatile:3t/+17.3% |
 
 **Result: 0/4 gates passed**
 
 ---
 
-### WF tune: PT=15%
+### WF tune: conf=0.45
 
-- **Rules:** `enhanced_buy_dip, momentum_reversal, trend_continuation, rsi_oversold, macd_bearish_crossover, trend_alignment, golden_cross, trend_break_warning, death_cross, seasonality`
-- **Profit Target:** 15%
-- **Min Confidence:** 0.5
+- **Rules:** `enhanced_buy_dip, momentum_reversal, trend_continuation, rsi_oversold, macd_bearish_crossover, trend_alignment, golden_cross, trend_break_warning, death_cross, seasonality, energy_momentum, energy_mean_reversion, energy_seasonality, midstream_yield_reversion`
+- **Profit Target:** 10%
+- **Min Confidence:** 0.45
 - **Max Loss:** 5.0%
 - **Cooldown:** 3 bars
 
-**Performance:** Return=-28.3%, Trades=11, WR=9.1%, Sharpe=-0.59, PF=0.35, DD=-39.5%
+**Performance:** Return=-33.6%, Trades=34, WR=26.5%, Sharpe=-0.53, PF=0.62, DD=-50.2%
 
 | Gate | Status | Detail |
 |------|--------|--------|
-| Walk-Forward | FAIL | Train Sharpe=-0.59, Test Sharpe=0.00, Ratio=0% (need >=50%) |
-| Bootstrap | FAIL | p=0.9252, Sharpe CI=[-28.86, 1.02], WR CI=[0.0%, 27.3%] |
-| Monte Carlo | FAIL | Ruin=0.0%, P95 DD=-41.9%, Median equity=$686, Survival=100.0% |
-| Regime | FAIL | bull:7t/-37.3%, bear:2t/-8.3%, chop:1t/-7.0%, volatile:1t/+18.1% |
+| Walk-Forward | FAIL | Train Sharpe=-0.85, Test Sharpe=-0.02, Ratio=0% (need >=50%) |
+| Bootstrap | FAIL | p=0.8197, Sharpe CI=[-4.35, 1.25], WR CI=[14.7%, 44.1%] |
+| Monte Carlo | FAIL | Ruin=6.5%, P95 DD=-55.9%, Median equity=$655, Survival=93.5% |
+| Regime | FAIL | bull:23t/-28.2%, bear:3t/-15.7%, chop:5t/-7.9%, volatile:3t/+17.3% |
 
 **Result: 0/4 gates passed**
 
@@ -155,33 +159,34 @@ EOG — Premium US shale E&P — Eagle Ford, Permian, Powder River Basin. Large-
 
 | Config | WF | BS | MC | Regime | Sharpe | Return | Trades |
 |--------|-----|-----|-----|--------|--------|--------|--------|
-| **WF tune: PT=8%** | FAIL | FAIL | FAIL | FAIL | **-0.53** | **-25.9%** | 21 |
-| WF tune: PT=12% | FAIL | FAIL | FAIL | FAIL | -0.58 | -27.6% | 13 |
-| WF tune: PT=15% | FAIL | FAIL | FAIL | FAIL | -0.59 | -28.3% | 11 |
-| Alt A: Full general rules (10 rules, 10%/5%) | FAIL | FAIL | FAIL | FAIL | -0.63 | -26.9% | 22 |
+| **MC tune: ATR stops x2.0** | FAIL | FAIL | FAIL | FAIL | **-0.49** | **-31.0%** | 36 |
+| WF tune: ATR stops x2.5 | FAIL | FAIL | FAIL | FAIL | -0.52 | -32.2% | 34 |
+| Alt D: Energy rules (14 rules, 10%/5%) | FAIL | FAIL | FAIL | FAIL | -0.53 | -33.6% | 34 |
+| WF tune: conf=0.45 | FAIL | FAIL | FAIL | FAIL | -0.53 | -33.6% | 34 |
 
 ---
 
 ## 5. Final Recommendation
 
-**EOG partially validates.** Best config: WF tune: PT=8% (0/4 gates).
+**EOG partially validates.** Best config: MC tune: ATR stops x2.0 (0/4 gates).
 
-### WF tune: PT=8%
+### MC tune: ATR stops x2.0
 
-- **Rules:** `enhanced_buy_dip, momentum_reversal, trend_continuation, rsi_oversold, macd_bearish_crossover, trend_alignment, golden_cross, trend_break_warning, death_cross, seasonality`
-- **Profit Target:** 8%
+- **Rules:** `enhanced_buy_dip, momentum_reversal, trend_continuation, rsi_oversold, macd_bearish_crossover, trend_alignment, golden_cross, trend_break_warning, death_cross, seasonality, energy_momentum, energy_mean_reversion, energy_seasonality, midstream_yield_reversion`
+- **Profit Target:** 10%
 - **Min Confidence:** 0.5
 - **Max Loss:** 5.0%
 - **Cooldown:** 3 bars
+- **Stop Mode:** ATR x2.0
 
-**Performance:** Return=-25.9%, Trades=21, WR=28.6%, Sharpe=-0.53, PF=0.60, DD=-38.4%
+**Performance:** Return=-31.0%, Trades=36, WR=25.0%, Sharpe=-0.49, PF=0.64, DD=-47.9%
 
 | Gate | Status | Detail |
 |------|--------|--------|
-| Walk-Forward | FAIL | Train Sharpe=-0.50, Test Sharpe=0.00, Ratio=0% (need >=50%) |
-| Bootstrap | FAIL | p=0.8082, Sharpe CI=[-6.20, 1.70], WR CI=[9.5%, 47.6%] |
-| Monte Carlo | FAIL | Ruin=0.1%, P95 DD=-45.2%, Median equity=$737, Survival=99.9% |
-| Regime | FAIL | bull:15t/-26.3%, bear:2t/-8.4%, chop:2t/-10.8%, volatile:2t/+19.8% |
+| Walk-Forward | FAIL | Train Sharpe=-0.77, Test Sharpe=0.02, Ratio=0% (need >=50%) |
+| Bootstrap | FAIL | p=0.7992, Sharpe CI=[-4.19, 1.32], WR CI=[13.9%, 41.7%] |
+| Monte Carlo | FAIL | Ruin=3.8%, P95 DD=-53.9%, Median equity=$683, Survival=96.2% |
+| Regime | FAIL | bull:25t/-24.5%, bear:3t/-15.7%, chop:5t/-7.9%, volatile:3t/+17.3% |
 
 **Result: 0/4 gates passed**
 
