@@ -129,6 +129,15 @@ RULE_CONFIGS: Dict[str, Dict] = {
         "description": "Buy miners on 1.5x+ volume breakouts (high conviction)",
         "default_params": {"min_volume_ratio": 1.5},
     },
+    # Financial Sector Rules
+    "financial_mean_reversion": {
+        "description": "Buy financial stocks when oversold at BB support in mean-reverting environment",
+        "default_params": {"bb_oversold": 0.10, "rsi_floor": 28.0, "rsi_ceiling": 42.0, "adx_max": 25.0},
+    },
+    "financial_seasonality": {
+        "description": "Adjust confidence based on financial sector seasonal patterns",
+        "default_params": {},
+    },
 }
 
 
