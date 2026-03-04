@@ -1,10 +1,10 @@
 # CVX (Chevron) Validated Optimization Results
 
-**Date:** 2026-03-02
+**Date:** 2026-03-03
 **Period:** 2021-01-01 to 2026-02-28
 **Initial Cash:** $1,000
 **Timeframe:** Daily-only screening + multi-TF re-validation
-**Validation Runtime:** 16.2 minutes
+**Validation Runtime:** 20.5 minutes
 **Category:** Large-cap integrated oil
 
 ---
@@ -34,30 +34,31 @@ CVX — Second-largest US integrated oil major — Permian, LNG, refining. Large
 | Alt A: Full general rules (10 rules, 10%/5%) | 15 | 26.7% | -15.2% | -0.27 | 0.52 | -34.3% |
 | Alt B: Tighter stops (3 rules, 10%/4%) | 9 | 11.1% | -31.0% | -0.92 | 0.13 | -39.7% |
 | Alt C: Wider PT (3 rules, 12%/5%) | 9 | 11.1% | -33.5% | -0.87 | 0.14 | -42.8% |
-| Alt D: Energy-extended rules (12 rules, 10%/5%) | 15 | 26.7% | -15.2% | -0.27 | 0.52 | -34.3% |
+| Alt D: Energy rules (14 rules, 10%/5%) | 22 | 40.9% | -11.0% | -0.18 | 0.76 | -33.9% |
+| Alt E: integrated sector rules (3 rules, 10%/5%) | 16 | 37.5% | -21.0% | -0.36 | 0.50 | -42.0% |
 
-**Best baseline selected for validation: Alt A: Full general rules (10 rules, 10%/5%)**
+**Best baseline selected for validation: Alt D: Energy rules (14 rules, 10%/5%)**
 
 ---
 
 ## 2. Full Validation
 
-### Alt A: Full general rules (10 rules, 10%/5%)
+### Alt D: Energy rules (14 rules, 10%/5%)
 
-- **Rules:** `enhanced_buy_dip, momentum_reversal, trend_continuation, rsi_oversold, macd_bearish_crossover, trend_alignment, golden_cross, trend_break_warning, death_cross, seasonality`
+- **Rules:** `enhanced_buy_dip, momentum_reversal, trend_continuation, rsi_oversold, macd_bearish_crossover, trend_alignment, golden_cross, trend_break_warning, death_cross, seasonality, energy_momentum, energy_mean_reversion, energy_seasonality, midstream_yield_reversion`
 - **Profit Target:** 10%
 - **Min Confidence:** 0.5
 - **Max Loss:** 5.0%
 - **Cooldown:** 3 bars
 
-**Performance:** Return=-15.2%, Trades=15, WR=26.7%, Sharpe=-0.27, PF=0.52, DD=-34.3%
+**Performance:** Return=-11.0%, Trades=22, WR=40.9%, Sharpe=-0.18, PF=0.76, DD=-33.9%
 
 | Gate | Status | Detail |
 |------|--------|--------|
-| Walk-Forward | FAIL | Train Sharpe=-0.61, Test Sharpe=0.56, Ratio=0% (need >=50%) |
-| Bootstrap | FAIL | p=0.6726, Sharpe CI=[-6.22, 2.70], WR CI=[13.3%, 60.0%] |
-| Monte Carlo | **PASS** | Ruin=0.0%, P95 DD=-37.5%, Median equity=$856, Survival=100.0% |
-| Regime | FAIL | bull:10t/-6.4%, bear:1t/-1.8%, chop:1t/+1.2%, volatile:3t/-4.2% |
+| Walk-Forward | FAIL | Train Sharpe=-0.73, Test Sharpe=0.82, Ratio=0% (need >=50%) |
+| Bootstrap | FAIL | p=0.5632, Sharpe CI=[-3.76, 2.78], WR CI=[27.3%, 68.2%] |
+| Monte Carlo | **PASS** | Ruin=0.0%, P95 DD=-37.8%, Median equity=$918, Survival=100.0% |
+| Regime | FAIL | bull:16t/-3.7%, bear:1t/-1.8%, chop:2t/+6.1%, volatile:3t/-4.2% |
 
 **Result: 1/4 gates passed**
 
@@ -69,40 +70,60 @@ CVX — Second-largest US integrated oil major — Permian, LNG, refining. Large
 
 | Config | Trades | Win Rate | Return | Sharpe |
 |--------|--------|----------|--------|--------|
-| WF tune: conf=0.45 | 15 | 26.7% | -15.2% | -0.27 |
-| BS tune: conf=0.4 | 15 | 26.7% | -15.2% | -0.27 |
+| WF tune: PT=8% | 27 | 44.4% | -1.1% | -0.03 |
+| BS tune: energy rules (14) | 22 | 40.9% | -11.0% | -0.18 |
+| BS tune: conf=0.4 | 21 | 38.1% | -13.7% | -0.18 |
+| Regime tune: tighter stop 4% | 23 | 39.1% | -11.8% | -0.18 |
+| WF tune: conf=0.45 | 22 | 36.4% | -12.4% | -0.19 |
+| WF tune: ATR stops x2.5 | 23 | 39.1% | -12.8% | -0.19 |
 | BS tune: full rules (10) | 15 | 26.7% | -15.2% | -0.27 |
-| BS tune: energy rules (12) | 15 | 26.7% | -15.2% | -0.27 |
-| BS tune: + volume_breakout | 15 | 26.7% | -15.2% | -0.27 |
-| BS tune: + commodity_breakout | 15 | 26.7% | -15.2% | -0.27 |
-| Regime tune: + dollar_weakness | 15 | 26.7% | -15.2% | -0.27 |
-| WF tune: PT=8% | 21 | 33.3% | -17.3% | -0.31 |
-| Regime tune: tighter stop 4% | 17 | 23.5% | -18.9% | -0.31 |
-| WF tune: PT=15% | 16 | 25.0% | -18.6% | -0.33 |
-| WF tune: PT=12% | 16 | 25.0% | -21.0% | -0.40 |
-| WF tune: cooldown=7 | 16 | 25.0% | -20.5% | -0.41 |
-| WF tune: conf=0.65 | 16 | 18.8% | -24.7% | -0.63 |
-| WF tune: conf=0.55 | 17 | 17.6% | -26.2% | -0.68 |
-| WF tune: conf=0.6 | 17 | 17.6% | -26.0% | -0.71 |
+| WF tune: PT=15% | 22 | 36.4% | -15.8% | -0.27 |
+| WF tune: PT=12% | 22 | 36.4% | -18.4% | -0.31 |
+| BS tune: sector-specific rules | 15 | 40.0% | -17.0% | -0.32 |
+| WF tune: cooldown=7 | 22 | 36.4% | -18.8% | -0.34 |
+| WF tune: conf=0.55 | 23 | 30.4% | -22.1% | -0.48 |
+| WF tune: conf=0.65 | 20 | 30.0% | -23.4% | -0.54 |
+| WF tune: conf=0.6 | 24 | 29.2% | -27.9% | -0.58 |
 
 ### Full Validation of Top Candidates
 
-### WF tune: conf=0.45
+### WF tune: PT=8%
 
-- **Rules:** `enhanced_buy_dip, momentum_reversal, trend_continuation, rsi_oversold, macd_bearish_crossover, trend_alignment, golden_cross, trend_break_warning, death_cross, seasonality`
-- **Profit Target:** 10%
-- **Min Confidence:** 0.45
+- **Rules:** `enhanced_buy_dip, momentum_reversal, trend_continuation, rsi_oversold, macd_bearish_crossover, trend_alignment, golden_cross, trend_break_warning, death_cross, seasonality, energy_momentum, energy_mean_reversion, energy_seasonality, midstream_yield_reversion`
+- **Profit Target:** 8%
+- **Min Confidence:** 0.5
 - **Max Loss:** 5.0%
 - **Cooldown:** 3 bars
 
-**Performance:** Return=-15.2%, Trades=15, WR=26.7%, Sharpe=-0.27, PF=0.52, DD=-34.3%
+**Performance:** Return=-1.1%, Trades=27, WR=44.4%, Sharpe=-0.03, PF=0.92, DD=-31.3%
 
 | Gate | Status | Detail |
 |------|--------|--------|
-| Walk-Forward | FAIL | Train Sharpe=-0.61, Test Sharpe=0.56, Ratio=0% (need >=50%) |
-| Bootstrap | FAIL | p=0.6726, Sharpe CI=[-6.22, 2.70], WR CI=[13.3%, 60.0%] |
-| Monte Carlo | **PASS** | Ruin=0.0%, P95 DD=-37.5%, Median equity=$856, Survival=100.0% |
-| Regime | FAIL | bull:10t/-6.4%, bear:1t/-1.8%, chop:1t/+1.2%, volatile:3t/-4.2% |
+| Walk-Forward | FAIL | Train Sharpe=-1.15, Test Sharpe=0.82, Ratio=0% (need >=50%) |
+| Bootstrap | FAIL | p=0.4217, Sharpe CI=[-2.57, 3.09], WR CI=[29.6%, 66.7%] |
+| Monte Carlo | **PASS** | Ruin=0.0%, P95 DD=-35.0%, Median equity=$1,037, Survival=100.0% |
+| Regime | FAIL | bull:18t/-0.5%, bear:3t/+1.9%, chop:3t/-0.8%, volatile:3t/+7.9% |
+
+**Result: 1/4 gates passed**
+
+---
+
+### BS tune: energy rules (14)
+
+- **Rules:** `enhanced_buy_dip, momentum_reversal, trend_continuation, rsi_oversold, macd_bearish_crossover, trend_alignment, golden_cross, trend_break_warning, death_cross, seasonality, energy_momentum, energy_mean_reversion, energy_seasonality, midstream_yield_reversion`
+- **Profit Target:** 10%
+- **Min Confidence:** 0.5
+- **Max Loss:** 5.0%
+- **Cooldown:** 3 bars
+
+**Performance:** Return=-11.0%, Trades=22, WR=40.9%, Sharpe=-0.18, PF=0.76, DD=-33.9%
+
+| Gate | Status | Detail |
+|------|--------|--------|
+| Walk-Forward | FAIL | Train Sharpe=-0.73, Test Sharpe=0.82, Ratio=0% (need >=50%) |
+| Bootstrap | FAIL | p=0.5632, Sharpe CI=[-3.76, 2.78], WR CI=[27.3%, 68.2%] |
+| Monte Carlo | **PASS** | Ruin=0.0%, P95 DD=-37.8%, Median equity=$918, Survival=100.0% |
+| Regime | FAIL | bull:16t/-3.7%, bear:1t/-1.8%, chop:2t/+6.1%, volatile:3t/-4.2% |
 
 **Result: 1/4 gates passed**
 
@@ -110,43 +131,22 @@ CVX — Second-largest US integrated oil major — Permian, LNG, refining. Large
 
 ### BS tune: conf=0.4
 
-- **Rules:** `enhanced_buy_dip, momentum_reversal, trend_continuation, rsi_oversold, macd_bearish_crossover, trend_alignment, golden_cross, trend_break_warning, death_cross, seasonality`
+- **Rules:** `enhanced_buy_dip, momentum_reversal, trend_continuation, rsi_oversold, macd_bearish_crossover, trend_alignment, golden_cross, trend_break_warning, death_cross, seasonality, energy_momentum, energy_mean_reversion, energy_seasonality, midstream_yield_reversion`
 - **Profit Target:** 10%
 - **Min Confidence:** 0.4
 - **Max Loss:** 5.0%
 - **Cooldown:** 3 bars
 
-**Performance:** Return=-15.2%, Trades=15, WR=26.7%, Sharpe=-0.27, PF=0.52, DD=-34.3%
+**Performance:** Return=-13.7%, Trades=21, WR=38.1%, Sharpe=-0.18, PF=0.73, DD=-36.5%
 
 | Gate | Status | Detail |
 |------|--------|--------|
-| Walk-Forward | FAIL | Train Sharpe=-0.61, Test Sharpe=0.56, Ratio=0% (need >=50%) |
-| Bootstrap | FAIL | p=0.6726, Sharpe CI=[-6.22, 2.70], WR CI=[13.3%, 60.0%] |
-| Monte Carlo | **PASS** | Ruin=0.0%, P95 DD=-37.5%, Median equity=$856, Survival=100.0% |
-| Regime | FAIL | bull:10t/-6.4%, bear:1t/-1.8%, chop:1t/+1.2%, volatile:3t/-4.2% |
+| Walk-Forward | FAIL | Train Sharpe=-0.57, Test Sharpe=0.82, Ratio=0% (need >=50%) |
+| Bootstrap | FAIL | p=0.5815, Sharpe CI=[-3.99, 2.79], WR CI=[23.8%, 61.9%] |
+| Monte Carlo | FAIL | Ruin=0.0%, P95 DD=-40.5%, Median equity=$894, Survival=100.0% |
+| Regime | FAIL | bull:15t/-5.9%, bear:1t/-1.8%, chop:2t/+6.1%, volatile:3t/-4.2% |
 
-**Result: 1/4 gates passed**
-
----
-
-### BS tune: full rules (10)
-
-- **Rules:** `enhanced_buy_dip, momentum_reversal, trend_continuation, rsi_oversold, macd_bearish_crossover, trend_alignment, golden_cross, trend_break_warning, death_cross, seasonality`
-- **Profit Target:** 10%
-- **Min Confidence:** 0.5
-- **Max Loss:** 5.0%
-- **Cooldown:** 3 bars
-
-**Performance:** Return=-15.2%, Trades=15, WR=26.7%, Sharpe=-0.27, PF=0.52, DD=-34.3%
-
-| Gate | Status | Detail |
-|------|--------|--------|
-| Walk-Forward | FAIL | Train Sharpe=-0.61, Test Sharpe=0.56, Ratio=0% (need >=50%) |
-| Bootstrap | FAIL | p=0.6726, Sharpe CI=[-6.22, 2.70], WR CI=[13.3%, 60.0%] |
-| Monte Carlo | **PASS** | Ruin=0.0%, P95 DD=-37.5%, Median equity=$856, Survival=100.0% |
-| Regime | FAIL | bull:10t/-6.4%, bear:1t/-1.8%, chop:1t/+1.2%, volatile:3t/-4.2% |
-
-**Result: 1/4 gates passed**
+**Result: 0/4 gates passed**
 
 ---
 
@@ -154,33 +154,33 @@ CVX — Second-largest US integrated oil major — Permian, LNG, refining. Large
 
 | Config | WF | BS | MC | Regime | Sharpe | Return | Trades |
 |--------|-----|-----|-----|--------|--------|--------|--------|
-| **Alt A: Full general rules (10 rules, 10%/5%)** | FAIL | FAIL | **PASS** | FAIL | **-0.27** | **-15.2%** | 15 |
-| WF tune: conf=0.45 | FAIL | FAIL | **PASS** | FAIL | -0.27 | -15.2% | 15 |
-| BS tune: conf=0.4 | FAIL | FAIL | **PASS** | FAIL | -0.27 | -15.2% | 15 |
-| BS tune: full rules (10) | FAIL | FAIL | **PASS** | FAIL | -0.27 | -15.2% | 15 |
+| **WF tune: PT=8%** | FAIL | FAIL | **PASS** | FAIL | **-0.03** | **-1.1%** | 27 |
+| Alt D: Energy rules (14 rules, 10%/5%) | FAIL | FAIL | **PASS** | FAIL | -0.18 | -11.0% | 22 |
+| BS tune: energy rules (14) | FAIL | FAIL | **PASS** | FAIL | -0.18 | -11.0% | 22 |
+| BS tune: conf=0.4 | FAIL | FAIL | FAIL | FAIL | -0.18 | -13.7% | 21 |
 
 ---
 
 ## 5. Final Recommendation
 
-**CVX partially validates.** Best config: Alt A: Full general rules (10 rules, 10%/5%) (1/4 gates).
+**CVX partially validates.** Best config: WF tune: PT=8% (1/4 gates).
 
-### Alt A: Full general rules (10 rules, 10%/5%)
+### WF tune: PT=8%
 
-- **Rules:** `enhanced_buy_dip, momentum_reversal, trend_continuation, rsi_oversold, macd_bearish_crossover, trend_alignment, golden_cross, trend_break_warning, death_cross, seasonality`
-- **Profit Target:** 10%
+- **Rules:** `enhanced_buy_dip, momentum_reversal, trend_continuation, rsi_oversold, macd_bearish_crossover, trend_alignment, golden_cross, trend_break_warning, death_cross, seasonality, energy_momentum, energy_mean_reversion, energy_seasonality, midstream_yield_reversion`
+- **Profit Target:** 8%
 - **Min Confidence:** 0.5
 - **Max Loss:** 5.0%
 - **Cooldown:** 3 bars
 
-**Performance:** Return=-15.2%, Trades=15, WR=26.7%, Sharpe=-0.27, PF=0.52, DD=-34.3%
+**Performance:** Return=-1.1%, Trades=27, WR=44.4%, Sharpe=-0.03, PF=0.92, DD=-31.3%
 
 | Gate | Status | Detail |
 |------|--------|--------|
-| Walk-Forward | FAIL | Train Sharpe=-0.61, Test Sharpe=0.56, Ratio=0% (need >=50%) |
-| Bootstrap | FAIL | p=0.6726, Sharpe CI=[-6.22, 2.70], WR CI=[13.3%, 60.0%] |
-| Monte Carlo | **PASS** | Ruin=0.0%, P95 DD=-37.5%, Median equity=$856, Survival=100.0% |
-| Regime | FAIL | bull:10t/-6.4%, bear:1t/-1.8%, chop:1t/+1.2%, volatile:3t/-4.2% |
+| Walk-Forward | FAIL | Train Sharpe=-1.15, Test Sharpe=0.82, Ratio=0% (need >=50%) |
+| Bootstrap | FAIL | p=0.4217, Sharpe CI=[-2.57, 3.09], WR CI=[29.6%, 66.7%] |
+| Monte Carlo | **PASS** | Ruin=0.0%, P95 DD=-35.0%, Median equity=$1,037, Survival=100.0% |
+| Regime | FAIL | bull:18t/-0.5%, bear:3t/+1.9%, chop:3t/-0.8%, volatile:3t/+7.9% |
 
 **Result: 1/4 gates passed**
 

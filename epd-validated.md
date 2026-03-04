@@ -1,10 +1,10 @@
 # EPD (Enterprise Products Partners) Validated Optimization Results
 
-**Date:** 2026-03-02
+**Date:** 2026-03-03
 **Period:** 2021-01-01 to 2026-02-28
 **Initial Cash:** $1,000
 **Timeframe:** Daily-only screening + multi-TF re-validation
-**Validation Runtime:** 16.3 minutes
+**Validation Runtime:** 29.7 minutes
 **Category:** Large-cap midstream
 
 ---
@@ -34,32 +34,34 @@ EPD — Midstream MLP — pipelines, storage, NGL processing. Large-cap midstrea
 | Alt A: Full general rules (10 rules, 10%/5%) | 10 | 50.0% | +11.4% | 0.16 | 1.47 | -15.2% |
 | Alt B: Tighter stops (3 rules, 10%/4%) | 11 | 36.4% | -1.0% | -0.15 | 0.95 | -15.4% |
 | Alt C: Wider PT (3 rules, 12%/5%) | 7 | 42.9% | +3.9% | -0.01 | 1.17 | -15.4% |
-| Alt D: Energy-extended rules (12 rules, 10%/5%) | 10 | 50.0% | +11.4% | 0.16 | 1.47 | -15.2% |
+| Alt D: Energy rules (14 rules, 10%/5%) | 15 | 46.7% | +12.7% | 0.18 | 1.45 | -14.9% |
+| Alt E: midstream sector rules (3 rules, 10%/5%) | 13 | 53.8% | +19.7% | 0.35 | 1.73 | -14.0% |
+| Alt F: Midstream 8% PT / 4% stop | 14 | 50.0% | +8.7% | 0.12 | 1.19 | -13.8% |
 
-**Best baseline selected for validation: Alt A: Full general rules (10 rules, 10%/5%)**
+**Best baseline selected for validation: Alt E: midstream sector rules (3 rules, 10%/5%)**
 
 ---
 
 ## 2. Full Validation
 
-### Alt A: Full general rules (10 rules, 10%/5%)
+### Alt E: midstream sector rules (3 rules, 10%/5%)
 
-- **Rules:** `enhanced_buy_dip, momentum_reversal, trend_continuation, rsi_oversold, macd_bearish_crossover, trend_alignment, golden_cross, trend_break_warning, death_cross, seasonality`
+- **Rules:** `midstream_yield_reversion, energy_seasonality, death_cross`
 - **Profit Target:** 10%
 - **Min Confidence:** 0.5
 - **Max Loss:** 5.0%
-- **Cooldown:** 3 bars
+- **Cooldown:** 5 bars
 
-**Performance:** Return=+11.4%, Trades=10, WR=50.0%, Sharpe=0.16, PF=1.47, DD=-15.2%
+**Performance:** Return=+19.7%, Trades=13, WR=53.8%, Sharpe=0.35, PF=1.73, DD=-14.0%
 
 | Gate | Status | Detail |
 |------|--------|--------|
-| Walk-Forward | FAIL | Train Sharpe=-0.34, Test Sharpe=0.54, Ratio=0% (need >=50%) |
-| Bootstrap | FAIL | p=0.2213, Sharpe CI=[-3.11, 7.31], WR CI=[30.0%, 90.0%] |
-| Monte Carlo | **PASS** | Ruin=0.0%, P95 DD=-17.3%, Median equity=$1,145, Survival=100.0% |
-| Regime | FAIL | bull:7t/+21.3%, volatile:3t/-5.8% |
+| Walk-Forward | **PASS** | Train Sharpe=0.42, Test Sharpe=0.45, Ratio=107% (need >=50%) |
+| Bootstrap | FAIL | p=0.1675, Sharpe CI=[-2.06, 7.09], WR CI=[30.8%, 76.9%] |
+| Monte Carlo | **PASS** | Ruin=0.0%, P95 DD=-20.3%, Median equity=$1,240, Survival=100.0% |
+| Regime | FAIL | bull:11t/+24.5%, bear:2t/+0.3% |
 
-**Result: 1/4 gates passed**
+**Result: 2/4 gates passed**
 
 ---
 
@@ -69,84 +71,104 @@ EPD — Midstream MLP — pipelines, storage, NGL processing. Large-cap midstrea
 
 | Config | Trades | Win Rate | Return | Sharpe |
 |--------|--------|----------|--------|--------|
-| WF tune: PT=15% | 8 | 50.0% | +16.1% | 0.24 |
-| WF tune: PT=12% | 10 | 50.0% | +17.1% | 0.22 |
-| WF tune: conf=0.45 | 10 | 50.0% | +11.4% | 0.16 |
-| BS tune: conf=0.4 | 10 | 50.0% | +11.4% | 0.16 |
+| BS tune: conf=0.4 | 13 | 53.8% | +21.0% | 0.39 |
+| BS tune: conf=0.45 | 13 | 53.8% | +19.7% | 0.35 |
+| BS tune: conf=0.55 | 13 | 53.8% | +19.7% | 0.35 |
+| BS tune: + energy_momentum | 13 | 53.8% | +19.7% | 0.35 |
+| BS tune: + energy_mean_reversion | 13 | 53.8% | +19.7% | 0.35 |
+| Regime tune: tighter stop 4% | 13 | 46.2% | +16.8% | 0.34 |
+| Regime tune: PT=12% | 12 | 50.0% | +19.9% | 0.31 |
+| Regime tune: conf=0.65 | 9 | 55.6% | +16.4% | 0.27 |
+| BS tune: cooldown=7 | 12 | 50.0% | +16.1% | 0.25 |
+| BS tune: cooldown=3 | 13 | 46.2% | +13.7% | 0.22 |
+| Regime tune: PT=15% | 11 | 45.5% | +14.1% | 0.22 |
+| BS tune: energy rules (14) | 15 | 46.7% | +12.7% | 0.18 |
 | BS tune: full rules (10) | 10 | 50.0% | +11.4% | 0.16 |
-| BS tune: energy rules (12) | 10 | 50.0% | +11.4% | 0.16 |
-| BS tune: + volume_breakout | 10 | 50.0% | +11.4% | 0.16 |
-| BS tune: + commodity_breakout | 10 | 50.0% | +11.4% | 0.16 |
-| Regime tune: + dollar_weakness | 10 | 50.0% | +11.4% | 0.16 |
-| Regime tune: tighter stop 4% | 13 | 38.5% | +8.5% | 0.10 |
-| WF tune: cooldown=7 | 10 | 50.0% | +5.3% | 0.01 |
-| WF tune: PT=8% | 12 | 50.0% | +3.3% | -0.06 |
-| WF tune: conf=0.55 | 23 | 30.4% | -17.8% | -0.49 |
-| WF tune: conf=0.6 | 20 | 35.0% | -21.9% | -0.64 |
-| WF tune: conf=0.65 | 14 | 14.3% | -29.3% | -1.23 |
+| BS tune: conf=0.4 [multi-TF] | 26 | 42.3% | +10.2% | 0.14 |
 
 ### Full Validation of Top Candidates
 
-### WF tune: PT=15%
+### BS tune: conf=0.4
 
-- **Rules:** `enhanced_buy_dip, momentum_reversal, trend_continuation, rsi_oversold, macd_bearish_crossover, trend_alignment, golden_cross, trend_break_warning, death_cross, seasonality`
-- **Profit Target:** 15%
-- **Min Confidence:** 0.5
+- **Rules:** `midstream_yield_reversion, energy_seasonality, death_cross`
+- **Profit Target:** 10%
+- **Min Confidence:** 0.4
 - **Max Loss:** 5.0%
-- **Cooldown:** 3 bars
+- **Cooldown:** 5 bars
 
-**Performance:** Return=+16.1%, Trades=8, WR=50.0%, Sharpe=0.24, PF=2.28, DD=-15.0%
+**Performance:** Return=+21.0%, Trades=13, WR=53.8%, Sharpe=0.39, PF=1.81, DD=-13.0%
 
 | Gate | Status | Detail |
 |------|--------|--------|
-| Walk-Forward | FAIL | Train Sharpe=-0.22, Test Sharpe=0.57, Ratio=0% (need >=50%) |
-| Bootstrap | FAIL | p=0.1972, Sharpe CI=[-5.05, 7.09], WR CI=[12.5%, 87.5%] |
-| Monte Carlo | **PASS** | Ruin=0.0%, P95 DD=-12.7%, Median equity=$1,189, Survival=100.0% |
-| Regime | FAIL | bull:5t/+25.7%, volatile:3t/-5.8% |
+| Walk-Forward | **PASS** | Train Sharpe=0.42, Test Sharpe=0.58, Ratio=137% (need >=50%) |
+| Bootstrap | FAIL | p=0.1559, Sharpe CI=[-1.92, 7.27], WR CI=[30.8%, 84.6%] |
+| Monte Carlo | **PASS** | Ruin=0.0%, P95 DD=-19.6%, Median equity=$1,255, Survival=100.0% |
+| Regime | FAIL | bull:11t/+25.7%, bear:2t/+0.3% |
 
-**Result: 1/4 gates passed**
-
----
-
-### WF tune: PT=12%
-
-- **Rules:** `enhanced_buy_dip, momentum_reversal, trend_continuation, rsi_oversold, macd_bearish_crossover, trend_alignment, golden_cross, trend_break_warning, death_cross, seasonality`
-- **Profit Target:** 12%
-- **Min Confidence:** 0.5
-- **Max Loss:** 5.0%
-- **Cooldown:** 3 bars
-
-**Performance:** Return=+17.1%, Trades=10, WR=50.0%, Sharpe=0.22, PF=1.80, DD=-17.7%
-
-| Gate | Status | Detail |
-|------|--------|--------|
-| Walk-Forward | FAIL | Train Sharpe=-0.22, Test Sharpe=0.57, Ratio=0% (need >=50%) |
-| Bootstrap | FAIL | p=0.2117, Sharpe CI=[-3.61, 6.60], WR CI=[20.0%, 80.0%] |
-| Monte Carlo | **PASS** | Ruin=0.0%, P95 DD=-19.3%, Median equity=$1,205, Survival=100.0% |
-| Regime | FAIL | bull:7t/+27.9%, volatile:3t/-5.8% |
-
-**Result: 1/4 gates passed**
+**Result: 2/4 gates passed**
 
 ---
 
-### WF tune: conf=0.45
+### BS tune: conf=0.45
 
-- **Rules:** `enhanced_buy_dip, momentum_reversal, trend_continuation, rsi_oversold, macd_bearish_crossover, trend_alignment, golden_cross, trend_break_warning, death_cross, seasonality`
+- **Rules:** `midstream_yield_reversion, energy_seasonality, death_cross`
 - **Profit Target:** 10%
 - **Min Confidence:** 0.45
 - **Max Loss:** 5.0%
-- **Cooldown:** 3 bars
+- **Cooldown:** 5 bars
 
-**Performance:** Return=+11.4%, Trades=10, WR=50.0%, Sharpe=0.16, PF=1.47, DD=-15.2%
+**Performance:** Return=+19.7%, Trades=13, WR=53.8%, Sharpe=0.35, PF=1.73, DD=-14.0%
 
 | Gate | Status | Detail |
 |------|--------|--------|
-| Walk-Forward | FAIL | Train Sharpe=-0.34, Test Sharpe=0.54, Ratio=0% (need >=50%) |
-| Bootstrap | FAIL | p=0.2213, Sharpe CI=[-3.11, 7.31], WR CI=[30.0%, 90.0%] |
-| Monte Carlo | **PASS** | Ruin=0.0%, P95 DD=-17.3%, Median equity=$1,145, Survival=100.0% |
-| Regime | FAIL | bull:7t/+21.3%, volatile:3t/-5.8% |
+| Walk-Forward | **PASS** | Train Sharpe=0.42, Test Sharpe=0.45, Ratio=107% (need >=50%) |
+| Bootstrap | FAIL | p=0.1675, Sharpe CI=[-2.06, 7.09], WR CI=[30.8%, 76.9%] |
+| Monte Carlo | **PASS** | Ruin=0.0%, P95 DD=-20.3%, Median equity=$1,240, Survival=100.0% |
+| Regime | FAIL | bull:11t/+24.5%, bear:2t/+0.3% |
 
-**Result: 1/4 gates passed**
+**Result: 2/4 gates passed**
+
+---
+
+### BS tune: conf=0.55
+
+- **Rules:** `midstream_yield_reversion, energy_seasonality, death_cross`
+- **Profit Target:** 10%
+- **Min Confidence:** 0.55
+- **Max Loss:** 5.0%
+- **Cooldown:** 5 bars
+
+**Performance:** Return=+19.7%, Trades=13, WR=53.8%, Sharpe=0.35, PF=1.73, DD=-14.0%
+
+| Gate | Status | Detail |
+|------|--------|--------|
+| Walk-Forward | **PASS** | Train Sharpe=0.42, Test Sharpe=0.45, Ratio=107% (need >=50%) |
+| Bootstrap | FAIL | p=0.1675, Sharpe CI=[-2.06, 7.09], WR CI=[30.8%, 76.9%] |
+| Monte Carlo | **PASS** | Ruin=0.0%, P95 DD=-20.3%, Median equity=$1,240, Survival=100.0% |
+| Regime | FAIL | bull:11t/+24.5%, bear:2t/+0.3% |
+
+**Result: 2/4 gates passed**
+
+---
+
+### BS tune: conf=0.4 [multi-TF]
+
+- **Rules:** `midstream_yield_reversion, energy_seasonality, death_cross`
+- **Profit Target:** 10%
+- **Min Confidence:** 0.4
+- **Max Loss:** 5.0%
+- **Cooldown:** 5 bars
+
+**Performance:** Return=+10.2%, Trades=26, WR=42.3%, Sharpe=0.14, PF=1.20, DD=-17.0%
+
+| Gate | Status | Detail |
+|------|--------|--------|
+| Walk-Forward | **PASS** | Train Sharpe=0.32, Test Sharpe=0.20, Ratio=61% (need >=50%) |
+| Bootstrap | FAIL | p=0.2421, Sharpe CI=[-2.09, 3.54], WR CI=[30.8%, 69.2%] |
+| Monte Carlo | **PASS** | Ruin=0.0%, P95 DD=-21.8%, Median equity=$1,164, Survival=100.0% |
+| Regime | FAIL | bull:21t/+15.6%, bear:1t/-1.1%, chop:4t/+3.4% |
+
+**Result: 2/4 gates passed**
 
 ---
 
@@ -154,41 +176,42 @@ EPD — Midstream MLP — pipelines, storage, NGL processing. Large-cap midstrea
 
 | Config | WF | BS | MC | Regime | Sharpe | Return | Trades |
 |--------|-----|-----|-----|--------|--------|--------|--------|
-| **WF tune: PT=15%** | FAIL | FAIL | **PASS** | FAIL | **0.24** | **+16.1%** | 8 |
-| WF tune: PT=12% | FAIL | FAIL | **PASS** | FAIL | 0.22 | +17.1% | 10 |
-| Alt A: Full general rules (10 rules, 10%/5%) | FAIL | FAIL | **PASS** | FAIL | 0.16 | +11.4% | 10 |
-| WF tune: conf=0.45 | FAIL | FAIL | **PASS** | FAIL | 0.16 | +11.4% | 10 |
+| **BS tune: conf=0.4** | **PASS** | FAIL | **PASS** | FAIL | **0.39** | **+21.0%** | 13 |
+| Alt E: midstream sector rules (3 rules, 10%/5%) | **PASS** | FAIL | **PASS** | FAIL | 0.35 | +19.7% | 13 |
+| BS tune: conf=0.45 | **PASS** | FAIL | **PASS** | FAIL | 0.35 | +19.7% | 13 |
+| BS tune: conf=0.55 | **PASS** | FAIL | **PASS** | FAIL | 0.35 | +19.7% | 13 |
+| BS tune: conf=0.4 [multi-TF] | **PASS** | FAIL | **PASS** | FAIL | 0.14 | +10.2% | 26 |
 
 ---
 
 ## 5. Final Recommendation
 
-**EPD partially validates.** Best config: WF tune: PT=15% (1/4 gates).
+**EPD partially validates.** Best config: BS tune: conf=0.4 (2/4 gates).
 
-### WF tune: PT=15%
+### BS tune: conf=0.4
 
-- **Rules:** `enhanced_buy_dip, momentum_reversal, trend_continuation, rsi_oversold, macd_bearish_crossover, trend_alignment, golden_cross, trend_break_warning, death_cross, seasonality`
-- **Profit Target:** 15%
-- **Min Confidence:** 0.5
+- **Rules:** `midstream_yield_reversion, energy_seasonality, death_cross`
+- **Profit Target:** 10%
+- **Min Confidence:** 0.4
 - **Max Loss:** 5.0%
-- **Cooldown:** 3 bars
+- **Cooldown:** 5 bars
 
-**Performance:** Return=+16.1%, Trades=8, WR=50.0%, Sharpe=0.24, PF=2.28, DD=-15.0%
+**Performance:** Return=+21.0%, Trades=13, WR=53.8%, Sharpe=0.39, PF=1.81, DD=-13.0%
 
 | Gate | Status | Detail |
 |------|--------|--------|
-| Walk-Forward | FAIL | Train Sharpe=-0.22, Test Sharpe=0.57, Ratio=0% (need >=50%) |
-| Bootstrap | FAIL | p=0.1972, Sharpe CI=[-5.05, 7.09], WR CI=[12.5%, 87.5%] |
-| Monte Carlo | **PASS** | Ruin=0.0%, P95 DD=-12.7%, Median equity=$1,189, Survival=100.0% |
-| Regime | FAIL | bull:5t/+25.7%, volatile:3t/-5.8% |
+| Walk-Forward | **PASS** | Train Sharpe=0.42, Test Sharpe=0.58, Ratio=137% (need >=50%) |
+| Bootstrap | FAIL | p=0.1559, Sharpe CI=[-1.92, 7.27], WR CI=[30.8%, 84.6%] |
+| Monte Carlo | **PASS** | Ruin=0.0%, P95 DD=-19.6%, Median equity=$1,255, Survival=100.0% |
+| Regime | FAIL | bull:11t/+25.7%, bear:2t/+0.3% |
 
-**Result: 1/4 gates passed**
+**Result: 2/4 gates passed**
 
 ---
 
 ### Deployment Recommendation
 
-- Consider blacklisting or significant restrictions
+- Conditional deployment with regime restrictions and/or reduced sizing
 - Monitor the failing gate(s) in live trading
 - Re-validate after 6 months of additional data
 

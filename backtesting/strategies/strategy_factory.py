@@ -138,6 +138,23 @@ RULE_CONFIGS: Dict[str, Dict] = {
         "description": "Adjust confidence based on financial sector seasonal patterns",
         "default_params": {},
     },
+    # Energy Sector Rules
+    "energy_momentum": {
+        "description": "Buy energy stocks in confirmed uptrend (ADX>25, golden cross, MACD positive)",
+        "default_params": {"adx_min": 25.0, "rsi_max": 75.0},
+    },
+    "energy_mean_reversion": {
+        "description": "Buy energy majors at triple-oversold (RSI+BB+Stoch) with SMA_200 support",
+        "default_params": {"rsi_oversold": 30.0, "bb_oversold": 0.10, "stoch_oversold": 20.0},
+    },
+    "energy_seasonality": {
+        "description": "Adjust confidence for energy seasonal patterns (driving season, winter heating)",
+        "default_params": {},
+    },
+    "midstream_yield_reversion": {
+        "description": "Buy midstream MLPs at yield expansion (5%+ below SMA_200)",
+        "default_params": {"min_discount_pct": 5.0, "rsi_oversold": 35.0},
+    },
 }
 
 

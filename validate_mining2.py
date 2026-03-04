@@ -1,17 +1,30 @@
 #!/usr/bin/env python3
 """
-Energy Sector Validate-Then-Tune Optimization
+Mining/Materials Extras — Validate-Then-Tune Optimization
 
-Generic validation script for oil & gas / energy stocks.
-Validates through 4 statistical gates, diagnoses failures, and tunes.
+Second batch of mining/materials stocks: copper miners, gold/silver ETFs & miners,
+uranium ETF, rare earth ETF, and oilfield services.
+
+Per-stock rule recommendations based on sub-sector research:
+- Copper (FCX, COPX): momentum-driven, high beta, ADX confirmation essential
+- Gold ETF (GLD): low-vol commodity, tight PT (6-8%), too expensive for small accounts
+- Gold miners (GDX, AEM): leveraged gold, GDX/GLD ratio mean-reversion is primary edge
+- Silver miners (SIL, PAAS): amplified silver, -83% max DD, strict risk controls
+- Uranium ETF (URA): CCJ-proven rules transfer directly (trend+seasonality+death_cross)
+- Rare earth (REMX): MP-proven approach, spike trading, volume breakout
+- Oilfield services (FET): NOT mining — uses energy rules, capex cycle-driven
 
 Usage:
-    python validate_energy.py XOM
-    python validate_energy.py CVX
-    python validate_energy.py OXY
-    python validate_energy.py XLE
-    python validate_energy.py EPD
-    python validate_energy.py ET
+    python validate_mining2.py FCX
+    python validate_mining2.py GDX
+    python validate_mining2.py GLD
+    python validate_mining2.py COPX
+    python validate_mining2.py SIL
+    python validate_mining2.py PAAS
+    python validate_mining2.py AEM
+    python validate_mining2.py URA
+    python validate_mining2.py REMX
+    python validate_mining2.py FET
 """
 
 import logging
@@ -58,132 +71,154 @@ INITIAL_CASH = 1000
 
 # Symbol descriptions
 SYMBOL_INFO = {
-    "XOM": {
-        "name": "ExxonMobil",
-        "description": "Largest US integrated oil major — upstream, downstream, chemicals",
-        "tier": "Large-cap integrated oil",
+    "FCX": {
+        "name": "Freeport-McMoRan",
+        "description": "Largest publicly traded copper miner — Grasberg mine, gold/moly byproducts",
+        "tier": "Large-cap copper miner",
     },
-    "CVX": {
-        "name": "Chevron",
-        "description": "Second-largest US integrated oil major — Permian, LNG, refining",
-        "tier": "Large-cap integrated oil",
+    "COPX": {
+        "name": "Global X Copper Miners ETF",
+        "description": "Basket of ~30 global copper miners — diversified copper exposure",
+        "tier": "Copper miners ETF",
     },
-    "OXY": {
-        "name": "Occidental Petroleum",
-        "description": "E&P focused, Permian Basin, Buffett-backed, carbon capture",
-        "tier": "Large-cap E&P",
+    "GDX": {
+        "name": "VanEck Gold Miners ETF",
+        "description": "Basket of ~50 senior gold miners — 2-3x leveraged to gold price",
+        "tier": "Gold miners ETF",
     },
-    "XLE": {
-        "name": "Energy Select Sector SPDR ETF",
-        "description": "Broad energy sector basket — XOM, CVX top holdings",
-        "tier": "Energy sector ETF",
+    "GLD": {
+        "name": "SPDR Gold Trust",
+        "description": "Physical gold commodity ETF — tracks gold spot price directly",
+        "tier": "Gold commodity ETF (WARNING: ~$250/share, too expensive for $888 account)",
     },
-    "EPD": {
-        "name": "Enterprise Products Partners",
-        "description": "Midstream MLP — pipelines, storage, NGL processing",
-        "tier": "Large-cap midstream",
+    "SIL": {
+        "name": "Global X Silver Miners ETF",
+        "description": "Basket of ~30 silver miners — amplified silver exposure, -83% max DD historically",
+        "tier": "Silver miners ETF (HIGH RISK)",
     },
-    "ET": {
-        "name": "Energy Transfer",
-        "description": "Midstream MLP — pipelines, terminals, natural gas processing",
-        "tier": "Large-cap midstream",
+    "PAAS": {
+        "name": "Pan American Silver",
+        "description": "Largest primary silver producer in Americas — also gold, zinc, lead",
+        "tier": "Large-cap silver miner",
     },
-    "COP": {
-        "name": "ConocoPhillips",
-        "description": "Independent E&P — Permian, Eagle Ford, Bakken, Alaska, global LNG",
-        "tier": "Large-cap E&P",
+    "AEM": {
+        "name": "Agnico Eagle Mines",
+        "description": "Senior gold producer — tier-1 jurisdictions (Canada, Australia, Finland), low-cost",
+        "tier": "Large-cap gold miner",
     },
-    "CNQ": {
-        "name": "Canadian Natural Resources",
-        "description": "Canadian oil sands, heavy oil, conventional E&P, natural gas",
-        "tier": "Large-cap Canadian E&P",
+    "URA": {
+        "name": "Global X Uranium ETF",
+        "description": "Basket of uranium miners and nuclear component manufacturers",
+        "tier": "Uranium ETF",
     },
-    "EQNR": {
-        "name": "Equinor",
-        "description": "Norwegian state oil company — North Sea, offshore wind, LNG",
-        "tier": "Large-cap international oil",
+    "REMX": {
+        "name": "VanEck Rare Earth/Strategic Metals ETF",
+        "description": "Rare earth and strategic metals — geopolitical spike trading, China supply risk",
+        "tier": "Rare earth ETF",
     },
-    "EOG": {
-        "name": "EOG Resources",
-        "description": "Premium US shale E&P — Eagle Ford, Permian, Powder River Basin",
-        "tier": "Large-cap E&P",
-    },
-    "GUSH": {
-        "name": "Direxion Daily S&P Oil & Gas Bull 2X",
-        "description": "2x leveraged oil & gas ETF — daily rebalancing, volatility decay",
-        "tier": "Leveraged energy ETF",
+    "FET": {
+        "name": "Forum Energy Technologies",
+        "description": "Oilfield services equipment — capex cycle play, NOT mining",
+        "tier": "Small-cap oilfield services",
     },
 }
 
-# General rules (no mining-specific rules like miner_metal_ratio)
+# ============================================================================
+# Rule Sets
+# ============================================================================
+
+# General rules (no sector-specific rules)
 GENERAL_RULES_10 = [
     "enhanced_buy_dip", "momentum_reversal", "trend_continuation",
     "rsi_oversold", "macd_bearish_crossover", "trend_alignment",
     "golden_cross", "trend_break_warning", "death_cross", "seasonality",
 ]
 
-# Energy-extended rules: general + commodity-relevant + energy-specific
-ENERGY_RULES_14 = GENERAL_RULES_10 + [
-    "energy_momentum", "energy_mean_reversion",
-    "energy_seasonality", "midstream_yield_reversion",
+# Mining-specific rules
+MINING_RULES = [
+    "commodity_breakout", "miner_metal_ratio", "dollar_weakness",
+    "seasonality", "volume_breakout",
+]
+
+# Full mining set: general + mining-specific
+FULL_MINING_14 = GENERAL_RULES_10 + [
+    "commodity_breakout", "miner_metal_ratio", "volume_breakout", "dollar_weakness",
 ]
 
 # Lean baselines
 LEAN_RULES_3 = ["trend_continuation", "seasonality", "death_cross"]
 
-# Energy-specific lean: momentum + mean-reversion + seasonality + exit protection
-ENERGY_LEAN_MOMENTUM = ["energy_momentum", "energy_seasonality", "death_cross"]
-ENERGY_LEAN_REVERSION = ["energy_mean_reversion", "energy_seasonality", "death_cross"]
-MIDSTREAM_LEAN = ["midstream_yield_reversion", "energy_seasonality", "death_cross"]
+# Mining lean sets by sub-sector
+MINING_LEAN_MOMENTUM = ["commodity_breakout", "trend_continuation", "seasonality", "death_cross"]
+MINING_LEAN_RATIO = ["miner_metal_ratio", "trend_continuation", "seasonality", "death_cross"]
+MINING_LEAN_VOLUME = ["volume_breakout", "trend_continuation", "seasonality", "death_cross"]
 
-# Per-stock recommended rule sets based on sub-sector characteristics
-# Upstream E&P (COP, EOG, OXY): momentum-driven, high beta → momentum + wider stops
-# Integrated (XOM, CVX, EQNR): mean-reverting, dividend floor → mean-reversion + BB
-# Midstream (EPD, ET): yield-anchored, fee-based → yield reversion + lower vol
+# Energy rules for FET (oilfield services — NOT mining)
+ENERGY_LEAN_MOMENTUM = ["energy_momentum", "energy_seasonality", "death_cross"]
+
+# Per-stock recommended rule sets based on research
 STOCK_RULE_RECOMMENDATIONS = {
-    "XOM": ENERGY_LEAN_REVERSION,    # Integrated: mean-reverting, dividend floor
-    "CVX": ENERGY_LEAN_REVERSION,    # Integrated: mean-reverting, dividend floor
-    "EQNR": ENERGY_LEAN_REVERSION,   # Integrated: mean-reverting
-    "COP": ENERGY_LEAN_MOMENTUM,     # E&P: momentum when commodity trends
-    "EOG": ENERGY_LEAN_MOMENTUM,     # E&P: momentum, premium shale
-    "OXY": ENERGY_LEAN_MOMENTUM,     # E&P: high beta, needs momentum rules
-    "EPD": MIDSTREAM_LEAN,           # Midstream MLP: yield-driven
-    "ET": MIDSTREAM_LEAN,            # Midstream MLP: yield-driven
-    "XLE": ENERGY_LEAN_MOMENTUM,     # ETF: momentum (cap-weighted E&P heavy)
-    "GUSH": ENERGY_LEAN_MOMENTUM,    # Leveraged: momentum only, will likely fail anyway
-    "CNQ": ENERGY_LEAN_MOMENTUM,     # Canadian E&P
+    # Copper miners: momentum-driven, high beta, need ADX/golden cross
+    "FCX": MINING_LEAN_MOMENTUM,
+    "COPX": MINING_LEAN_MOMENTUM,
+
+    # Gold miners: GDX/GLD ratio mean-reversion + breakout
+    "GDX": MINING_LEAN_RATIO,
+    "AEM": MINING_LEAN_MOMENTUM,  # Senior producer, trends more smoothly
+
+    # Gold commodity: tight params, low vol
+    "GLD": LEAN_RULES_3,  # Low vol, tight PT — generic rules work
+
+    # Silver miners: high risk, volume confirmation critical
+    "SIL": MINING_LEAN_VOLUME,
+    "PAAS": MINING_LEAN_VOLUME,
+
+    # Uranium: CCJ-proven rules
+    "URA": LEAN_RULES_3,  # trend_continuation + seasonality + death_cross
+
+    # Rare earth: spike trading, volume breakout
+    "REMX": MINING_LEAN_VOLUME,
+
+    # Oilfield services: energy rules, NOT mining
+    "FET": ENERGY_LEAN_MOMENTUM,
 }
 
-# SPEED OPTIMIZATION: Use daily-only for screening & tuning (30s per run),
-# then multi-TF (daily entries + 5min exits) only for final validation of
-# the best config.
+# Sub-sector classification
+STOCK_SUBSECTOR = {
+    "FCX": "copper", "COPX": "copper",
+    "GDX": "gold_miner", "AEM": "gold_miner",
+    "GLD": "gold_commodity",
+    "SIL": "silver_miner", "PAAS": "silver_miner",
+    "URA": "uranium",
+    "REMX": "rare_earth",
+    "FET": "oilfield_services",
+}
+
+# ============================================================================
+# Baseline configs
+# ============================================================================
 
 BASELINE = dict(
     rules=LEAN_RULES_3,
     min_confidence=0.50,
-    profit_target=0.10,     # 10% profit target
-    stop_loss=1.0,          # Disabled — max_loss_pct is the effective stop
-    max_loss_pct=5.0,       # 5% max loss
+    profit_target=0.10,
+    stop_loss=1.0,
+    max_loss_pct=5.0,
     cooldown_bars=5,
     timeframe="daily",
-    exit_timeframe="daily",  # Daily-only for screening (fast)
+    exit_timeframe="daily",
 )
 
-# Multi-TF version for final validation only
+
 def make_multitf(kwargs: dict) -> dict:
     """Convert a daily-only config to multi-TF (daily entries + 5min exits)."""
     return {**kwargs, "exit_timeframe": "5min"}
 
 
 def get_alt_baselines(symbol: str) -> list:
-    """Get alternative baselines including stock-specific energy rules."""
-    recommended_rules = STOCK_RULE_RECOMMENDATIONS.get(symbol, ENERGY_LEAN_MOMENTUM)
-    sub_sector = {
-        "XOM": "integrated", "CVX": "integrated", "EQNR": "integrated",
-        "COP": "upstream", "EOG": "upstream", "OXY": "upstream",
-        "EPD": "midstream", "ET": "midstream",
-        "XLE": "energy_etf", "GUSH": "leveraged_etf", "CNQ": "upstream",
-    }.get(symbol, "upstream")
+    """Get alternative baselines including stock-specific mining rules."""
+    recommended_rules = STOCK_RULE_RECOMMENDATIONS.get(symbol, MINING_LEAN_MOMENTUM)
+    sub_sector = STOCK_SUBSECTOR.get(symbol, "copper")
 
     baselines = [
         (
@@ -226,9 +261,9 @@ def get_alt_baselines(symbol: str) -> list:
             ),
         ),
         (
-            f"Alt D: Energy rules ({len(ENERGY_RULES_14)} rules, 10%/5%)",
+            f"Alt D: Full mining rules ({len(FULL_MINING_14)} rules, 10%/5%)",
             dict(
-                rules=ENERGY_RULES_14,
+                rules=FULL_MINING_14,
                 min_confidence=0.50,
                 profit_target=0.10,
                 stop_loss=1.0,
@@ -239,7 +274,7 @@ def get_alt_baselines(symbol: str) -> list:
             ),
         ),
         (
-            f"Alt E: {sub_sector} sector rules ({len(recommended_rules)} rules, 10%/5%)",
+            f"Alt E: {sub_sector} rules ({len(recommended_rules)} rules, 10%/5%)",
             dict(
                 rules=recommended_rules,
                 min_confidence=0.50,
@@ -253,14 +288,15 @@ def get_alt_baselines(symbol: str) -> list:
         ),
     ]
 
-    # For upstream/OXY: add wider stop variant (energy is volatile)
-    if sub_sector in ("upstream", "leveraged_etf"):
+    # Sub-sector-specific Alt F variants
+    if sub_sector == "copper":
+        # Copper: wider PT (momentum runs), wider stops (volatile)
         baselines.append((
-            f"Alt F: {sub_sector} rules wider stops (10%/6%)",
+            "Alt F: Copper momentum (12%/6%)",
             dict(
-                rules=recommended_rules,
+                rules=MINING_LEAN_MOMENTUM,
                 min_confidence=0.50,
-                profit_target=0.10,
+                profit_target=0.12,
                 stop_loss=1.0,
                 max_loss_pct=6.0,
                 cooldown_bars=5,
@@ -268,17 +304,130 @@ def get_alt_baselines(symbol: str) -> list:
                 exit_timeframe="daily",
             ),
         ))
-
-    # For midstream: add smaller PT (lower vol, faster mean-reversion)
-    if sub_sector == "midstream":
+    elif sub_sector == "gold_commodity":
+        # GLD: tight PT and tight stops (low volatility)
         baselines.append((
-            "Alt F: Midstream 8% PT / 4% stop",
+            "Alt F: Gold commodity tight (6%/3%)",
             dict(
-                rules=MIDSTREAM_LEAN,
+                rules=LEAN_RULES_3,
+                min_confidence=0.55,
+                profit_target=0.06,
+                stop_loss=1.0,
+                max_loss_pct=3.0,
+                cooldown_bars=3,
+                timeframe="daily",
+                exit_timeframe="daily",
+            ),
+        ))
+        baselines.append((
+            "Alt G: Gold commodity (8%/4%)",
+            dict(
+                rules=LEAN_RULES_3,
                 min_confidence=0.50,
                 profit_target=0.08,
                 stop_loss=1.0,
                 max_loss_pct=4.0,
+                cooldown_bars=3,
+                timeframe="daily",
+                exit_timeframe="daily",
+            ),
+        ))
+    elif sub_sector == "gold_miner":
+        # Gold miners: ratio mean-reversion + wider PT
+        baselines.append((
+            "Alt F: Gold miner ratio (12%/5%)",
+            dict(
+                rules=MINING_LEAN_RATIO,
+                min_confidence=0.50,
+                profit_target=0.12,
+                stop_loss=1.0,
+                max_loss_pct=5.0,
+                cooldown_bars=5,
+                timeframe="daily",
+                exit_timeframe="daily",
+            ),
+        ))
+    elif sub_sector == "silver_miner":
+        # Silver miners: tight max_loss (catastrophic DD history), volume confirmation
+        baselines.append((
+            "Alt F: Silver miner strict risk (10%/4%)",
+            dict(
+                rules=MINING_LEAN_VOLUME,
+                min_confidence=0.55,
+                profit_target=0.10,
+                stop_loss=1.0,
+                max_loss_pct=4.0,
+                cooldown_bars=7,
+                timeframe="daily",
+                exit_timeframe="daily",
+            ),
+        ))
+        baselines.append((
+            "Alt G: Silver miner wider PT (12%/4%)",
+            dict(
+                rules=MINING_LEAN_VOLUME,
+                min_confidence=0.50,
+                profit_target=0.12,
+                stop_loss=1.0,
+                max_loss_pct=4.0,
+                cooldown_bars=5,
+                timeframe="daily",
+                exit_timeframe="daily",
+            ),
+        ))
+    elif sub_sector == "uranium":
+        # URA: CCJ-proven config
+        baselines.append((
+            "Alt F: CCJ-proven (10%/6%, conf=0.65, cd=7)",
+            dict(
+                rules=LEAN_RULES_3,
+                min_confidence=0.65,
+                profit_target=0.10,
+                stop_loss=1.0,
+                max_loss_pct=6.0,
+                cooldown_bars=7,
+                timeframe="daily",
+                exit_timeframe="daily",
+            ),
+        ))
+    elif sub_sector == "rare_earth":
+        # REMX: wider PT for spike trading, volume breakout
+        baselines.append((
+            "Alt F: Rare earth wide PT (15%/5%)",
+            dict(
+                rules=MINING_LEAN_VOLUME,
+                min_confidence=0.50,
+                profit_target=0.15,
+                stop_loss=1.0,
+                max_loss_pct=5.0,
+                cooldown_bars=5,
+                timeframe="daily",
+                exit_timeframe="daily",
+            ),
+        ))
+        baselines.append((
+            "Alt G: MP-style lean (15%/6%, conf=0.50)",
+            dict(
+                rules=LEAN_RULES_3,
+                min_confidence=0.50,
+                profit_target=0.15,
+                stop_loss=1.0,
+                max_loss_pct=6.0,
+                cooldown_bars=5,
+                timeframe="daily",
+                exit_timeframe="daily",
+            ),
+        ))
+    elif sub_sector == "oilfield_services":
+        # FET: energy momentum, wider stops for small-cap vol
+        baselines.append((
+            "Alt F: OFS momentum (12%/6%)",
+            dict(
+                rules=ENERGY_LEAN_MOMENTUM,
+                min_confidence=0.50,
+                profit_target=0.12,
+                stop_loss=1.0,
+                max_loss_pct=6.0,
                 cooldown_bars=5,
                 timeframe="daily",
                 exit_timeframe="daily",
@@ -509,12 +658,13 @@ def generate_tune_configs(
 ) -> List[tuple]:
     """Generate targeted tuning configs based on which gates failed.
 
-    Energy-specific: includes energy_momentum, energy_mean_reversion,
-    energy_seasonality, and midstream_yield_reversion rules.
+    Mining-specific: includes commodity_breakout, miner_metal_ratio,
+    volume_breakout, and sub-sector-specific rules.
     """
     configs = []
     base_rules = base_kwargs.get("rules", [])
-    recommended = STOCK_RULE_RECOMMENDATIONS.get(symbol, ENERGY_LEAN_MOMENTUM)
+    recommended = STOCK_RULE_RECOMMENDATIONS.get(symbol, MINING_LEAN_MOMENTUM)
+    sub_sector = STOCK_SUBSECTOR.get(symbol, "copper")
 
     if "Walk-Forward" in failed_gates:
         for pt in [0.08, 0.12, 0.15]:
@@ -535,12 +685,23 @@ def generate_tune_configs(
                     f"WF tune: cooldown={cb}",
                     {**base_kwargs, "cooldown_bars": cb},
                 ))
-        # Try ATR stops (energy needs adaptive stops)
+        # ATR stops (mining stocks need adaptive stops)
         configs.append((
             "WF tune: ATR stops x2.5",
             {**base_kwargs, "stop_mode": "atr", "atr_multiplier": 2.5,
              "atr_stop_min_pct": 3.0, "atr_stop_max_pct": 15.0},
         ))
+        # Mining-specific rules
+        if "commodity_breakout" not in base_rules:
+            configs.append((
+                "WF tune: + commodity_breakout",
+                {**base_kwargs, "rules": base_rules + ["commodity_breakout"]},
+            ))
+        if "miner_metal_ratio" not in base_rules:
+            configs.append((
+                "WF tune: + miner_metal_ratio",
+                {**base_kwargs, "rules": base_rules + ["miner_metal_ratio"]},
+            ))
 
     if "Bootstrap" in failed_gates:
         for mc in [0.40, 0.45, 0.55]:
@@ -560,28 +721,22 @@ def generate_tune_configs(
             "BS tune: full rules (10)",
             {**base_kwargs, "rules": GENERAL_RULES_10, "min_confidence": 0.50, "cooldown_bars": 3},
         ))
-        # Energy-specific rules (14 rules)
+        # Full mining rules (14)
         configs.append((
-            "BS tune: energy rules (14)",
-            {**base_kwargs, "rules": ENERGY_RULES_14, "min_confidence": 0.50, "cooldown_bars": 3},
+            "BS tune: full mining rules (14)",
+            {**base_kwargs, "rules": FULL_MINING_14, "min_confidence": 0.50, "cooldown_bars": 3},
         ))
         # Stock-specific recommended rules
         if recommended != base_rules:
             configs.append((
-                f"BS tune: sector-specific rules",
+                f"BS tune: {sub_sector} rules",
                 {**base_kwargs, "rules": recommended, "min_confidence": 0.50},
             ))
-        # Add energy_momentum
-        if "energy_momentum" not in base_rules:
+        # Volume breakout (more signals for thin-trade stocks)
+        if "volume_breakout" not in base_rules:
             configs.append((
-                "BS tune: + energy_momentum",
-                {**base_kwargs, "rules": base_rules + ["energy_momentum"]},
-            ))
-        # Add energy_mean_reversion
-        if "energy_mean_reversion" not in base_rules:
-            configs.append((
-                "BS tune: + energy_mean_reversion",
-                {**base_kwargs, "rules": base_rules + ["energy_mean_reversion"]},
+                "BS tune: + volume_breakout",
+                {**base_kwargs, "rules": base_rules + ["volume_breakout"]},
             ))
 
     if "Monte Carlo" in failed_gates:
@@ -599,32 +754,26 @@ def generate_tune_configs(
         ))
 
     if "Regime" in failed_gates:
-        # Energy-specific rules for regime diversification
-        if "energy_momentum" not in base_rules:
+        # Mining-specific rules for regime diversification
+        if "commodity_breakout" not in base_rules:
             configs.append((
-                "Regime tune: + energy_momentum",
-                {**base_kwargs, "rules": base_rules + ["energy_momentum"]},
+                "Regime tune: + commodity_breakout",
+                {**base_kwargs, "rules": base_rules + ["commodity_breakout"]},
             ))
-        if "energy_mean_reversion" not in base_rules:
+        if "miner_metal_ratio" not in base_rules:
             configs.append((
-                "Regime tune: + energy_mean_reversion",
-                {**base_kwargs, "rules": base_rules + ["energy_mean_reversion"]},
+                "Regime tune: + miner_metal_ratio",
+                {**base_kwargs, "rules": base_rules + ["miner_metal_ratio"]},
             ))
-        if "energy_seasonality" not in base_rules:
+        if "volume_breakout" not in base_rules:
             configs.append((
-                "Regime tune: + energy_seasonality",
-                {**base_kwargs, "rules": base_rules + ["energy_seasonality"]},
+                "Regime tune: + volume_breakout",
+                {**base_kwargs, "rules": base_rules + ["volume_breakout"]},
             ))
-        # For midstream: add yield reversion
-        if symbol in ("EPD", "ET") and "midstream_yield_reversion" not in base_rules:
-            configs.append((
-                "Regime tune: + yield_reversion",
-                {**base_kwargs, "rules": base_rules + ["midstream_yield_reversion"]},
-            ))
-        # Full energy rules
+        # Full mining rules
         configs.append((
-            "Regime tune: energy rules (14)",
-            {**base_kwargs, "rules": ENERGY_RULES_14, "min_confidence": 0.50, "cooldown_bars": 3},
+            "Regime tune: full mining rules (14)",
+            {**base_kwargs, "rules": FULL_MINING_14, "min_confidence": 0.50, "cooldown_bars": 3},
         ))
         # Full general rules
         configs.append((
@@ -636,7 +785,7 @@ def generate_tune_configs(
             "Regime tune: conf=0.65",
             {**base_kwargs, "min_confidence": 0.65},
         ))
-        # Wider PT (let energy trends run)
+        # Wider PT (let mining trends run)
         for pt in [0.12, 0.15]:
             if pt != base_kwargs.get("profit_target"):
                 configs.append((
@@ -649,6 +798,22 @@ def generate_tune_configs(
                 "Regime tune: tighter stop 4%",
                 {**base_kwargs, "max_loss_pct": 4.0},
             ))
+
+    # FET-specific: try energy rules if mining rules don't work
+    if symbol == "FET":
+        energy_rules_14 = GENERAL_RULES_10 + [
+            "energy_momentum", "energy_mean_reversion",
+            "energy_seasonality", "midstream_yield_reversion",
+        ]
+        configs.append((
+            "FET tune: energy rules (14)",
+            {**base_kwargs, "rules": energy_rules_14, "min_confidence": 0.50, "cooldown_bars": 3},
+        ))
+        configs.append((
+            "FET tune: energy momentum + wider PT (12%/6%)",
+            {**base_kwargs, "rules": ENERGY_LEAN_MOMENTUM,
+             "profit_target": 0.12, "max_loss_pct": 6.0},
+        ))
 
     # Deduplicate
     seen = set()
@@ -861,7 +1026,7 @@ def write_markdown_report(
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: python validate_energy.py <SYMBOL>")
+        print("Usage: python validate_mining2.py <SYMBOL>")
         print(f"  Symbols: {', '.join(SYMBOL_INFO.keys())}")
         sys.exit(1)
 
@@ -931,7 +1096,6 @@ def main():
     if valid_screens:
         best_screen = max(valid_screens, key=lambda r: r.backtest.sharpe_ratio or 0)
     else:
-        # Fall back to any screen with trades >= 5
         valid_screens_5 = [
             r for r in all_screens if r.backtest and r.backtest.total_trades >= 5
         ]
@@ -1025,9 +1189,7 @@ def main():
         mtf_report = run_full_validation(
             runner, symbol, f"{winner.label} [multi-TF]", mtf_kwargs, print_reports=True
         )
-        # Replace winner with multi-TF version for the report
         if mtf_report.backtest and mtf_report.backtest.total_trades >= 2:
-            # Add to tune_reports for the final report
             tune_reports.append(mtf_report)
             console.print(
                 f"\n  Multi-TF result: {mtf_report.pass_count}/4 gates, "
