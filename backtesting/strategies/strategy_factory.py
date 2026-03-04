@@ -155,6 +155,19 @@ RULE_CONFIGS: Dict[str, Dict] = {
         "description": "Buy midstream MLPs at yield expansion (5%+ below SMA_200)",
         "default_params": {"min_discount_pct": 5.0, "rsi_oversold": 35.0},
     },
+    # Tech/Growth Sector Rules
+    "tech_ema_pullback": {
+        "description": "Buy growth stocks on pullback to EMA_21 in confirmed uptrend",
+        "default_params": {},
+    },
+    "tech_mean_reversion": {
+        "description": "Buy tech stocks at triple-oversold (RSI+BB+Stoch) near support",
+        "default_params": {"bb_oversold": 0.10, "stoch_oversold": 20.0},
+    },
+    "tech_seasonality": {
+        "description": "Adjust confidence for tech seasonal patterns (strong Q4, weak summer)",
+        "default_params": {},
+    },
 }
 
 
