@@ -181,6 +181,19 @@ RULE_CONFIGS: Dict[str, Dict] = {
         "description": "Adjust confidence for utility seasonal patterns (strong Mar/Jul/Oct)",
         "default_params": {},
     },
+    # Consumer Staples Sector Rules
+    "consumer_staples_mean_reversion": {
+        "description": "Buy consumer staples when oversold at BB support in mean-reverting regime (ADX<18)",
+        "default_params": {"bb_oversold": 0.15, "rsi_ceiling": 45.0, "adx_max": 18.0},
+    },
+    "consumer_staples_pullback": {
+        "description": "Buy consumer staples pullbacks to SMA_50 support with momentum confirmation",
+        "default_params": {"pullback_tolerance_pct": 2.0},
+    },
+    "consumer_staples_seasonality": {
+        "description": "Adjust confidence for consumer staples seasonal patterns (Q1+Q4 strong, Sep weak)",
+        "default_params": {},
+    },
 }
 
 
