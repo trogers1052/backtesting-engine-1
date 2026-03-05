@@ -207,6 +207,19 @@ RULE_CONFIGS: Dict[str, Dict] = {
         "description": "Adjust confidence for healthcare seasonal patterns (Nov-Dec strong, Sep weak)",
         "default_params": {},
     },
+    # Industrial Sector Rules
+    "industrial_mean_reversion": {
+        "description": "Buy industrials when oversold at BB support in mean-reverting regime (ADX<22)",
+        "default_params": {"bb_oversold": 0.15, "rsi_ceiling": 42.0, "adx_max": 22.0},
+    },
+    "industrial_pullback": {
+        "description": "Buy industrial pullbacks to SMA_50 support with momentum confirmation",
+        "default_params": {"pullback_tolerance_pct": 2.5},
+    },
+    "industrial_seasonality": {
+        "description": "Adjust confidence for industrial seasonal patterns (Q4/Q1 strong, summer weak)",
+        "default_params": {},
+    },
 }
 
 
