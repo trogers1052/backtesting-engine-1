@@ -194,6 +194,19 @@ RULE_CONFIGS: Dict[str, Dict] = {
         "description": "Adjust confidence for consumer staples seasonal patterns (Q1+Q4 strong, Sep weak)",
         "default_params": {},
     },
+    # Healthcare Sector Rules
+    "healthcare_mean_reversion": {
+        "description": "Buy healthcare stocks when oversold at BB support in mean-reverting regime (ADX<20)",
+        "default_params": {"bb_oversold": 0.15, "rsi_ceiling": 45.0, "adx_max": 20.0},
+    },
+    "healthcare_pullback": {
+        "description": "Buy healthcare pullbacks to SMA_50 support with momentum confirmation",
+        "default_params": {"pullback_tolerance_pct": 2.5},
+    },
+    "healthcare_seasonality": {
+        "description": "Adjust confidence for healthcare seasonal patterns (Nov-Dec strong, Sep weak)",
+        "default_params": {},
+    },
 }
 
 
