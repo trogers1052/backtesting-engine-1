@@ -168,6 +168,19 @@ RULE_CONFIGS: Dict[str, Dict] = {
         "description": "Adjust confidence for tech seasonal patterns (strong Q4, weak summer)",
         "default_params": {},
     },
+    # Utility Sector Rules
+    "utility_mean_reversion": {
+        "description": "Buy utility stocks when oversold at BB support in mean-reverting regime",
+        "default_params": {"bb_oversold": 0.15, "rsi_ceiling": 42.0, "adx_max": 20.0},
+    },
+    "utility_rate_reversion": {
+        "description": "Buy utility pullbacks to SMA_50 support with momentum confirmation",
+        "default_params": {"pullback_tolerance_pct": 2.5},
+    },
+    "utility_seasonality": {
+        "description": "Adjust confidence for utility seasonal patterns (strong Mar/Jul/Oct)",
+        "default_params": {},
+    },
 }
 
 
