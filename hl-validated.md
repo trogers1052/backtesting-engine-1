@@ -193,7 +193,7 @@ While ruin probability is low (<1%), the P95 drawdown exceeds the 40% threshold 
 | Cooldown=3 | -46.5% | -66.1% | < 40% |
 | PT=20% | -48.3% | -66.0% | < 40% |
 
-In 5% of trade orderings, the strategy draws down 46-52% — catastrophic for an $888 account. The worst-case drawdown of -66% to -68% would leave the account at ~$320.
+In 5% of trade orderings, the strategy draws down 46-52% — catastrophic for a $1,000 account. The worst-case drawdown of -66% to -68% would leave the account at ~$340.
 
 ### Regime: Only Gate That Sometimes Passes
 

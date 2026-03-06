@@ -18,7 +18,7 @@ This move exceeds the >75% integrity threshold, confirming RXRX's binary risk pr
 - **Revenue:** Pre-revenue company
 - **Binary risk:** Clinical trial readouts cause 50-70%+ overnight gaps
 - **No systematic edge:** Mean-reversion and momentum rules cannot handle overnight binary events
-- **Position sizing impossible:** At $888 account, a single RXRX gap could destroy 30%+ of capital
+- **Position sizing impossible:** At $1,000 account, a single RXRX gap could destroy 30%+ of capital
 
 ## Recommendation
 
