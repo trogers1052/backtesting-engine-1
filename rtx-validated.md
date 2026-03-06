@@ -26,7 +26,7 @@ Validate-then-tune approach with daily-only screening for speed, multi-TF re-val
 
 ## 1. Baseline Screening
 
-RTX — defense/aerospace prime contractor. Steady secular uptrend driven by US/NATO defense spending, Pratt & Whitney engine orders, and geopolitical demand for missiles/radar. Price ~$213 — too expensive for $888 account now, but tradeable as account grows.
+RTX — defense/aerospace prime contractor. Steady secular uptrend driven by US/NATO defense spending, Pratt & Whitney engine orders, and geopolitical demand for missiles/radar. Price ~$213 — too expensive for $1,000 account now, but tradeable as account grows.
 
 | Config | Trades | Win Rate | Return | Sharpe | PF | Max DD |
 |--------|--------|----------|--------|--------|-----|--------|

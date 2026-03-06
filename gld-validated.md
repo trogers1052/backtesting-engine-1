@@ -5,7 +5,7 @@
 **Initial Cash:** $1,000
 **Timeframe:** Daily-only screening + multi-TF re-validation
 **Validation Runtime:** 60.1 minutes
-**Category:** Gold commodity ETF (WARNING: ~$250/share, too expensive for $888 account)
+**Category:** Gold commodity ETF (WARNING: ~$250/share, too expensive for $1,000 account)
 
 ---
 
@@ -26,7 +26,7 @@ Validate-then-tune approach with daily-only screening for speed, multi-TF re-val
 
 ## 1. Baseline Screening
 
-GLD — Physical gold commodity ETF — tracks gold spot price directly. Gold commodity ETF (WARNING: ~$250/share, too expensive for $888 account).
+GLD — Physical gold commodity ETF — tracks gold spot price directly. Gold commodity ETF (WARNING: ~$250/share, too expensive for $1,000 account).
 
 | Config | Trades | Win Rate | Return | Sharpe | PF | Max DD |
 |--------|--------|----------|--------|--------|-----|--------|

@@ -279,4 +279,4 @@ Both are precious metals ETFs, but their validation results diverge dramatically
 - Platinum decorrelates from equities in stress — silver correlates with risk-on sentiment
 - PPLT generates profitable trades across all regimes; SLV only profits in bull markets
 
-**Implication:** At $888 account size, PPLT is the preferred precious metals allocation. SLV is a secondary bet when bull conditions are confirmed.
+**Implication:** At $1,000 account size, PPLT is the preferred precious metals allocation. SLV is a secondary bet when bull conditions are confirmed.
