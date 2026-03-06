@@ -5,13 +5,21 @@ Generate Tier Rankings (S-F) from Backtesting Validation Results
 Reads all *-validated.md files and produces a composite score per symbol.
 
 Composite Score Formula (max 100):
-  score = (gates/4 * 40) + (sharpe_norm * 25) + (return_norm * 15) + (wr_norm * 10) + (pf_norm * 10)
+  score = (gates/4 * 35) + (sharpe_norm * 20) + (return_norm * 15) + (wr_norm * 10) + (pf_norm * 10) + (trades_norm * 10)
 
 Normalization (0-1, capped):
   sharpe_norm  = clamp(sharpe / 1.2, 0, 1)
   return_norm  = clamp(return_pct / 150, 0, 1)
   wr_norm      = clamp((win_rate - 30) / 40, 0, 1)
   pf_norm      = clamp((pf - 1.0) / 2.0, 0, 1)
+  trades_norm  = clamp((trades - 30) / 70, 0, 1)  — 30 = CLT floor, 100+ = full score
+
+Statistical basis for trade count (López de Prado, Bailey 2014):
+  <30 trades:   Statistically unreliable (below CLT floor)
+  30-50:        Bare minimum, limited confidence
+  50-100:       Basic reliability
+  100-200:      Solid confidence
+  200+:         Institutional-grade (rarely achieved in 5yr daily signals)
 
 Tier Cutoffs:
   S (85-100): Elite — full deployment, max conviction
@@ -65,19 +73,24 @@ def compute_score(r: SymbolResult) -> float:
     if r.blacklisted or r.zero_trades:
         return 0.0
 
-    gates_score = (r.gates_passed / 4) * 40
+    gates_score = (r.gates_passed / 4) * 35
     sharpe_norm = clamp(r.sharpe / 1.2) if r.sharpe > 0 else 0.0
     return_norm = clamp(r.total_return / 150) if r.total_return > 0 else 0.0
     wr_norm = clamp((r.win_rate - 30) / 40)
     pf_norm = clamp((r.profit_factor - 1.0) / 2.0) if r.profit_factor > 1.0 else 0.0
 
-    raw_score = gates_score + (sharpe_norm * 25) + (return_norm * 15) + (wr_norm * 10) + (pf_norm * 10)
+    # Trade count: 30 = CLT statistical floor (0.0), 100+ = full score (1.0)
+    # Below 30 trades: penalty applied (negative norm reduces score)
+    trades_norm = clamp((r.trades - 30) / 70, -0.5, 1.0)
 
-    # Penalty for very few trades (<5): less statistically meaningful
-    if r.trades < 5 and r.trades > 0:
-        raw_score *= 0.7
+    raw_score = (gates_score
+                 + (sharpe_norm * 20)
+                 + (return_norm * 15)
+                 + (wr_norm * 10)
+                 + (pf_norm * 10)
+                 + (trades_norm * 10))
 
-    return round(raw_score, 1)
+    return round(max(raw_score, 0.0), 1)
 
 
 def assign_tier(score: float) -> str:
@@ -356,7 +369,7 @@ def write_report(results: List[SymbolResult], filepath: str):
         f.write(f"# Backtesting Tier Rankings\n\n")
         f.write(f"**Generated:** {date.today()}\n")
         f.write(f"**Symbols:** {len(results)}\n")
-        f.write(f"**Scoring:** Composite (gates 40% + Sharpe 25% + return 15% + win rate 10% + profit factor 10%)\n\n")
+        f.write(f"**Scoring:** Composite (gates 35% + Sharpe 20% + return 15% + trades 10% + win rate 10% + profit factor 10%)\n\n")
 
         # Tier summary
         f.write("## Tier Summary\n\n")
