@@ -364,7 +364,13 @@ class BacktraderRunner:
             trades=trades,
         )
 
-        logger.info(f"  Backtest complete: {total_trades} trades, {win_rate:.1%} win rate")
+        sharpe_str = f"{sharpe_ratio:.2f}" if sharpe_ratio is not None else "N/A"
+        logger.info(
+            f"Backtest complete: {symbol} {start_date}->{end_date} | "
+            f"{total_trades} trades, {win_rate:.0%} WR, "
+            f"return={total_return:+.1%}, Sharpe={sharpe_str}, "
+            f"maxDD={max_drawdown_pct:.1f}%"
+        )
         return result
 
     def run_multiple(
