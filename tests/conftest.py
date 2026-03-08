@@ -1,6 +1,10 @@
 """Shared fixtures for backtesting-service tests."""
 
 import os
+
+# Set required env vars before any Settings() instantiation
+os.environ.setdefault("MARKET_DATA_DB_PASSWORD", "test")
+
 import sys
 import types
 from datetime import date

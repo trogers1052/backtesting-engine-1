@@ -17,7 +17,7 @@ Key sector insights:
 - ADX < 22 confirms mean-reverting (higher than staples/utilities, lower than financials)
 - RSI oversold 33-36 (deeper dips than staples, shallower than tech)
 - Infrastructure spending (IIJA) provides multi-year tailwind through 2030
-- DE ($450+) and ETN ($310+) are expensive for $888 account — validate for future
+- DE ($450+) and ETN ($310+) are expensive for $1,000 account — validate for future
 - MMM has litigation overhang — wider stops needed
 - GE Aerospace is post-split, high beta — momentum rules preferred
 

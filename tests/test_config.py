@@ -119,7 +119,7 @@ class TestMarketDataDbUrl:
     def test_default_url(self):
         s = Settings()
         assert s.market_data_db_url == (
-            "postgresql://ingestor:ingestor@localhost:5433/stock_db"
+            "postgresql://ingestor:test@localhost:5433/stock_db"
         )
 
     def test_custom_url(self, monkeypatch):
