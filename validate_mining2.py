@@ -89,7 +89,7 @@ SYMBOL_INFO = {
     "GLD": {
         "name": "SPDR Gold Trust",
         "description": "Physical gold commodity ETF — tracks gold spot price directly",
-        "tier": "Gold commodity ETF (WARNING: ~$250/share, too expensive for $888 account)",
+        "tier": "Gold commodity ETF (WARNING: ~$250/share, too expensive for $1,000 account)",
     },
     "SIL": {
         "name": "Global X Silver Miners ETF",
