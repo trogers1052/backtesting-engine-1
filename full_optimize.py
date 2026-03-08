@@ -125,7 +125,7 @@ SYMBOL_CONTEXT = {
     "CCJ": """**Cameco (Uranium)** — Pure uranium play, beta 1.52. Uranium at 14-year highs (~$86.50/lb).
 Nuclear renaissance tailwind (AI data centers, government policy). Supply deficit: 180M lbs demand vs 130M lbs production.
 High correlation with URNM/UUUU. Best strategy: trend-following on uranium breakouts, buy dips to support.
-Seasonal: Q1-Q2 stronger (utility procurement). At $117/share — expensive for $888 account. Avoid extended holds above resistance without catalyst.""",
+Seasonal: Q1-Q2 stronger (utility procurement). At $117/share — expensive for $1,000 account. Avoid extended holds above resistance without catalyst.""",
 
     "CAT": """**Caterpillar (Industrial)** — Macro industrial bellwether, beta 1.05-1.21. Driven by construction spending,
 mining cycles, infrastructure. Outperforms in inflationary/capex boom periods. Clean trending stock ideal for

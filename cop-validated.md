@@ -1,67 +1,93 @@
 # COP (ConocoPhillips) Validated Optimization Results
 
-**Date:** 2026-03-03
-**Period:** 2021-01-01 to 2026-02-28
+**Date:** 2026-03-07
+**Period:** 2019-01-01 to 2026-03-07
 **Initial Cash:** $1,000
-**Timeframe:** Daily-only screening + multi-TF re-validation
-**Validation Runtime:** 30.6 minutes
-**Category:** Large-cap E&P
+**Validation:** Hybrid Walk-Backward (tune 6mo + holdout 2mo + historical regimes)
+**Runtime:** 82.6 minutes
+**Category:** B Tier — Upstream E&P
+**Bear Beta:** 0.90-1.00
 
 ---
 
 ## Methodology
 
-Validate-then-tune approach with daily-only screening for speed, multi-TF re-validation for final config.
+**Hybrid Walk-Backward Validation** — tune rules on recent market structure, then validate they survive historical regimes.
 
 ### Validation Gates
 
 | Gate | Method | Pass Criteria | Purpose |
 |------|--------|---------------|---------|
-| Walk-Forward | 70/30 train/test split, 5-day embargo, 10-day purge | Test Sharpe >= 50% of Train Sharpe | Detects parameter overfitting |
-| Bootstrap | 10,000 resamples with replacement | p < 0.05 AND Sharpe 95% CI excludes zero | Tests statistical significance |
-| Monte Carlo | 10,000 trade-order permutations | Ruin probability < 10% AND P95 drawdown < 40% | Measures worst-case risk |
-| Regime | SPY SMA_50/SMA_200 + VIX classification | No single regime contributes >70% of total profit | Detects regime dependency |
+| Walk-Backward | Tune on last 6mo, holdout 2mo, walk back through 2020-2024 | Holdout profitable + 3/4 regimes pass | Rules work in current AND historical markets |
+| Bootstrap | 10,000 resamples | p < 0.05 AND Sharpe CI excludes zero | Statistical significance |
+| Monte Carlo | 10,000 trade-order permutations | Ruin < 10% AND P95 DD < 40% | Worst-case risk |
+| Regime | SPY SMA_50/SMA_200 + VIX | No regime >70% of profit | Not regime-dependent |
+
+### Historical Regime Windows
+
+| Window | Period | Expected |
+|--------|--------|----------|
+| 2020 Crash + Recovery | Feb 2020 - Dec 2020 | Crisis/Bull |
+| 2021 Bull | Jan 2021 - Dec 2021 | Bull |
+| 2022 Bear (Rate Hike) | Jan 2022 - Oct 2022 | Bear |
+| 2023-2024 Chop | Jan 2023 - Jun 2024 | Chop |
 
 ---
 
 ## 1. Baseline Screening
 
-COP — Independent E&P — Permian, Eagle Ford, Bakken, Alaska, global LNG. Large-cap E&P.
+COP -- Lowest-cost independent E&P — Permian, Eagle Ford, Bakken, Alaska. B Tier — Upstream E&P.
 
 | Config | Trades | Win Rate | Return | Sharpe | PF | Max DD |
 |--------|--------|----------|--------|--------|-----|--------|
-| Lean 3 rules baseline (10%/5%, conf=0.50) | 9 | 22.2% | -20.9% | -0.54 | 0.38 | -31.9% |
-| Alt A: Full general rules (10 rules, 10%/5%) | 13 | 23.1% | -31.7% | -0.60 | 0.29 | -41.5% |
-| Alt B: Tighter stops (3 rules, 10%/4%) | 10 | 20.0% | -21.3% | -0.52 | 0.38 | -32.2% |
-| Alt C: Wider PT (3 rules, 12%/5%) | 9 | 22.2% | -19.7% | -0.48 | 0.42 | -31.8% |
-| Alt D: Energy rules (14 rules, 10%/5%) | 22 | 31.8% | -26.7% | -0.45 | 0.48 | -42.6% |
-| Alt E: upstream sector rules (3 rules, 10%/5%) | 15 | 26.7% | -24.2% | -0.41 | 0.40 | -40.7% |
-| Alt F: upstream rules wider stops (10%/6%) | 15 | 26.7% | -24.3% | -0.41 | 0.40 | -40.8% |
+| Lean 3 rules (10%/5%) | 9 | 22.2% | -18.7% | -0.43 | 0.38 | -31.9% |
+| Full general (10 rules, 10%/5%) | 13 | 23.1% | -29.8% | -0.51 | 0.29 | -41.5% |
+| Tighter stops (3 rules, 10%/4%) | 10 | 20.0% | -19.0% | -0.41 | 0.38 | -32.2% |
+| Wider PT (3 rules, 12%/5%) | 9 | 22.2% | -17.5% | -0.38 | 0.42 | -31.8% |
+| Energy rules (14, 10%/5%) | 22 | 36.4% | -23.9% | -0.34 | 0.61 | -42.6% |
+| Sector rules (upstream) | 15 | 33.3% | -21.4% | -0.31 | 0.57 | -40.7% |
+| Sector rules + 8% PT | 20 | 30.0% | -17.6% | -0.26 | 0.57 | -40.5% |
+| Sector + wider stops 6% | 15 | 33.3% | -21.5% | -0.31 | 0.57 | -40.8% |
 
-**Best baseline selected for validation: Alt F: upstream rules wider stops (10%/6%)**
+**Best baseline: Sector rules + 8% PT**
 
 ---
 
-## 2. Full Validation
+## 2. Full Validation (Walk-Backward)
 
-### Alt F: upstream rules wider stops (10%/6%)
+### Sector rules + 8% PT
 
 - **Rules:** `energy_momentum, energy_seasonality, death_cross`
-- **Profit Target:** 10%
+- **Profit Target:** 8%
 - **Min Confidence:** 0.5
-- **Max Loss:** 6.0%
+- **Max Loss:** 4.0%
 - **Cooldown:** 5 bars
 
-**Performance:** Return=-24.3%, Trades=15, WR=26.7%, Sharpe=-0.41, PF=0.40, DD=-40.8%
+**Performance:** Return=-17.6%, Trades=20, WR=30.0%, Sharpe=-0.26, PF=0.57, DD=-40.5%
 
 | Gate | Status | Detail |
 |------|--------|--------|
-| Walk-Forward | FAIL | Train Sharpe=-1.43, Test Sharpe=0.87, Ratio=0% (need >=50%) |
-| Bootstrap | FAIL | p=0.7946, Sharpe CI=[-6.85, 2.08], WR CI=[13.3%, 60.0%] |
-| Monte Carlo | FAIL | Ruin=0.1%, P95 DD=-43.9%, Median equity=$741, Survival=99.9% |
-| Regime | **PASS** | bull:11t/-1.5%, chop:2t/-3.0%, volatile:2t/-20.6% |
+| Walk-Backward | FAIL | Verdict=FRAGILE, Holdout=PASS (+0.0%), Regimes=0/4 (need 3) | 2022 Bear (Rate Hike): +0.0% [FAIL], 2021 Bull (Low Rat... |
+| Bootstrap | FAIL | p=0.6970, Sharpe CI=[-5.20, 2.31], WR CI=[15.0%, 55.0%] |
+| Monte Carlo | **PASS** | Ruin=0.0%, P95 DD=-38.4%, Median=$840, Survival=100.0% |
+| Regime | FAIL | bull:16t/-6.3%, chop:2t/+0.3%, volatile:2t/-7.5% |
 
 **Result: 1/4 gates passed**
+
+#### Walk-Backward Detail
+
+- **Tune period:** 2025-07-09 to 2026-01-05 (+0.0%, 0 trades)
+- **Holdout (forward):** 2026-01-06 to 2026-03-07 (+0.0%, 0 trades) **PASS**
+- **Regimes passed:** 0/4 (need 3)
+
+| Regime Window | Period | Return | Trades | Dominant | Status |
+|---------------|--------|--------|--------|----------|--------|
+| 2022 Bear (Rate Hike) | 2022-01-03 to 2022-10-14 | +0.0% | 0 | volatile | FAIL |
+| 2021 Bull (Low Rate Momentum) | 2021-01-04 to 2021-12-31 | +0.0% | 0 | bull | FAIL |
+| 2020 Crash + Recovery | 2020-02-19 to 2020-12-31 | -100.0% | 0 | error | FAIL |
+| 2023-2024 Choppy Transition | 2023-01-03 to 2024-06-30 | -13.1% | 3 | bull | FAIL |
+
+**Verdict: FRAGILE**
 
 ---
 
@@ -71,49 +97,89 @@ COP — Independent E&P — Permian, Eagle Ford, Bakken, Alaska, global LNG. Lar
 
 | Config | Trades | Win Rate | Return | Sharpe |
 |--------|--------|----------|--------|--------|
-| MC tune: max_loss=3.0% | 17 | 23.5% | -10.7% | -0.27 |
-| WF tune: PT=8% | 17 | 35.3% | -20.0% | -0.31 |
-| MC tune: max_loss=4.0% | 17 | 23.5% | -17.5% | -0.36 |
-| MC tune: ATR stops x2.0 | 15 | 26.7% | -22.8% | -0.40 |
-| WF tune: conf=0.65 | 12 | 25.0% | -24.7% | -0.41 |
-| WF tune: conf=0.45 | 15 | 26.7% | -24.3% | -0.41 |
-| WF tune: conf=0.55 | 15 | 26.7% | -24.3% | -0.41 |
-| WF tune: conf=0.6 | 15 | 26.7% | -24.3% | -0.41 |
-| BS tune: conf=0.4 | 15 | 26.7% | -24.3% | -0.41 |
-| BS tune: + energy_mean_reversion | 15 | 26.7% | -24.3% | -0.41 |
-| WF tune: ATR stops x2.5 | 15 | 26.7% | -23.6% | -0.41 |
-| WF tune: cooldown=3 | 16 | 31.2% | -25.0% | -0.44 |
-| WF tune: PT=12% | 13 | 23.1% | -25.6% | -0.46 |
-| WF tune: PT=15% | 13 | 23.1% | -26.3% | -0.49 |
-| BS tune: energy rules (14) | 21 | 33.3% | -33.0% | -0.54 |
-| WF tune: cooldown=7 | 13 | 23.1% | -29.5% | -0.55 |
-| BS tune: full rules (10) | 13 | 23.1% | -33.8% | -0.62 |
-| MC tune: max_loss=4.0% [multi-TF] | 37 | 43.2% | -24.1% | -0.63 |
+| WB tune: ATR x2.5 | 20 | 30.0% | -17.6% | -0.26 |
+| BS tune: conf=0.4 | 20 | 30.0% | -17.6% | -0.26 |
+| BS tune: conf=0.45 | 20 | 30.0% | -17.6% | -0.26 |
+| BS tune: conf=0.55 | 20 | 30.0% | -17.6% | -0.26 |
+| Reg tune: +mean_rev | 20 | 30.0% | -17.6% | -0.26 |
+| WB tune: PT=12% | 15 | 20.0% | -19.4% | -0.37 |
+| WB tune: PT=15% | 15 | 20.0% | -20.1% | -0.40 |
 
 ### Full Validation of Top Candidates
 
-### MC tune: max_loss=3.0%
+### WB tune: energy 14 rules
+
+- **Rules:** `enhanced_buy_dip, momentum_reversal, trend_continuation, rsi_oversold, macd_bearish_crossover, trend_alignment, golden_cross, trend_break_warning, death_cross, seasonality, energy_momentum, energy_mean_reversion, energy_seasonality, midstream_yield_reversion`
+- **Profit Target:** 8%
+- **Min Confidence:** 0.5
+- **Max Loss:** 4.0%
+- **Cooldown:** 3 bars
+
+**Performance:** Return=-9.2%, Trades=33, WR=36.4%, Sharpe=-0.11, PF=0.88, DD=-41.6%
+
+| Gate | Status | Detail |
+|------|--------|--------|
+| Walk-Backward | FAIL | Verdict=REGIME_DEPENDENT, Holdout=PASS (+0.0%), Regimes=1/4 (need 3) | 2022 Bear (Rate Hike): +4.0% [PASS], 2021 Bull... |
+| Bootstrap | FAIL | p=0.5297, Sharpe CI=[-2.91, 2.28], WR CI=[21.2%, 51.5%] |
+| Monte Carlo | FAIL | Ruin=0.0%, P95 DD=-41.0%, Median=$941, Survival=100.0% |
+| Regime | **PASS** | bull:26t/-8.2%, bear:3t/-15.4%, chop:1t/+8.3%, volatile:3t/+15.3% |
+
+**Result: 1/4 gates passed**
+
+#### Walk-Backward Detail
+
+- **Tune period:** 2025-07-09 to 2026-01-05 (+0.0%, 0 trades)
+- **Holdout (forward):** 2026-01-06 to 2026-03-07 (+0.0%, 0 trades) **PASS**
+- **Regimes passed:** 1/4 (need 3)
+
+| Regime Window | Period | Return | Trades | Dominant | Status |
+|---------------|--------|--------|--------|----------|--------|
+| 2022 Bear (Rate Hike) | 2022-01-03 to 2022-10-14 | +4.0% | 1 | volatile | **PASS** |
+| 2021 Bull (Low Rate Momentum) | 2021-01-04 to 2021-12-31 | +0.0% | 0 | bull | FAIL |
+| 2020 Crash + Recovery | 2020-02-19 to 2020-12-31 | -100.0% | 0 | error | FAIL |
+| 2023-2024 Choppy Transition | 2023-01-03 to 2024-06-30 | -13.2% | 9 | bull | FAIL |
+
+**Verdict: REGIME_DEPENDENT**
+
+---
+
+### WB tune: stop=3.0%
 
 - **Rules:** `energy_momentum, energy_seasonality, death_cross`
-- **Profit Target:** 10%
+- **Profit Target:** 8%
 - **Min Confidence:** 0.5
 - **Max Loss:** 3.0%
 - **Cooldown:** 5 bars
 
-**Performance:** Return=-10.7%, Trades=17, WR=23.5%, Sharpe=-0.27, PF=0.59, DD=-29.9%
+**Performance:** Return=-5.6%, Trades=20, WR=35.0%, Sharpe=-0.12, PF=0.76, DD=-32.1%
 
 | Gate | Status | Detail |
 |------|--------|--------|
-| Walk-Forward | FAIL | Train Sharpe=-2.03, Test Sharpe=0.87, Ratio=0% (need >=50%) |
-| Bootstrap | FAIL | p=0.6098, Sharpe CI=[-5.72, 2.82], WR CI=[11.8%, 52.9%] |
-| Monte Carlo | **PASS** | Ruin=0.0%, P95 DD=-33.5%, Median equity=$909, Survival=100.0% |
-| Regime | FAIL | bull:13t/+3.8%, chop:2t/-3.0%, volatile:2t/-7.0% |
+| Walk-Backward | FAIL | Verdict=FRAGILE, Holdout=PASS (+0.0%), Regimes=0/4 (need 3) | 2022 Bear (Rate Hike): +0.0% [FAIL], 2021 Bull (Low Rat... |
+| Bootstrap | FAIL | p=0.5025, Sharpe CI=[-3.93, 3.08], WR CI=[20.0%, 60.0%] |
+| Monte Carlo | **PASS** | Ruin=0.0%, P95 DD=-31.1%, Median=$976, Survival=100.0% |
+| Regime | FAIL | bull:16t/+7.7%, chop:2t/+0.3%, volatile:2t/-7.0% |
 
 **Result: 1/4 gates passed**
 
+#### Walk-Backward Detail
+
+- **Tune period:** 2025-07-09 to 2026-01-05 (+0.0%, 0 trades)
+- **Holdout (forward):** 2026-01-06 to 2026-03-07 (+0.0%, 0 trades) **PASS**
+- **Regimes passed:** 0/4 (need 3)
+
+| Regime Window | Period | Return | Trades | Dominant | Status |
+|---------------|--------|--------|--------|----------|--------|
+| 2022 Bear (Rate Hike) | 2022-01-03 to 2022-10-14 | +0.0% | 0 | volatile | FAIL |
+| 2021 Bull (Low Rate Momentum) | 2021-01-04 to 2021-12-31 | +0.0% | 0 | bull | FAIL |
+| 2020 Crash + Recovery | 2020-02-19 to 2020-12-31 | -100.0% | 0 | error | FAIL |
+| 2023-2024 Choppy Transition | 2023-01-03 to 2024-06-30 | -11.9% | 3 | bull | FAIL |
+
+**Verdict: FRAGILE**
+
 ---
 
-### WF tune: PT=8%
+### WB tune: stop=6.0%
 
 - **Rules:** `energy_momentum, energy_seasonality, death_cross`
 - **Profit Target:** 8%
@@ -121,101 +187,88 @@ COP — Independent E&P — Permian, Eagle Ford, Bakken, Alaska, global LNG. Lar
 - **Max Loss:** 6.0%
 - **Cooldown:** 5 bars
 
-**Performance:** Return=-20.0%, Trades=17, WR=35.3%, Sharpe=-0.31, PF=0.57, DD=-40.7%
+**Performance:** Return=-17.8%, Trades=17, WR=35.3%, Sharpe=-0.25, PF=0.57, DD=-40.7%
 
 | Gate | Status | Detail |
 |------|--------|--------|
-| Walk-Forward | FAIL | Train Sharpe=-1.36, Test Sharpe=1.09, Ratio=0% (need >=50%) |
-| Bootstrap | FAIL | p=0.7157, Sharpe CI=[-5.21, 2.40], WR CI=[17.6%, 64.7%] |
-| Monte Carlo | FAIL | Ruin=0.0%, P95 DD=-42.0%, Median equity=$797, Survival=100.0% |
-| Regime | FAIL | bull:13t/+2.5%, chop:2t/+0.3%, volatile:2t/-20.6% |
+| Walk-Backward | FAIL | Verdict=FRAGILE, Holdout=PASS (+0.0%), Regimes=0/4 (need 3) | 2022 Bear (Rate Hike): +0.0% [FAIL], 2021 Bull (Low Rat... |
+| Bootstrap | FAIL | p=0.6754, Sharpe CI=[-4.92, 2.67], WR CI=[17.6%, 64.7%] |
+| Monte Carlo | FAIL | Ruin=0.0%, P95 DD=-41.6%, Median=$824, Survival=100.0% |
+| Regime | FAIL | bull:13t/+5.9%, chop:2t/+0.3%, volatile:2t/-20.6% |
 
 **Result: 0/4 gates passed**
 
----
+#### Walk-Backward Detail
 
-### MC tune: max_loss=4.0%
+- **Tune period:** 2025-07-09 to 2026-01-05 (+0.0%, 0 trades)
+- **Holdout (forward):** 2026-01-06 to 2026-03-07 (+0.0%, 0 trades) **PASS**
+- **Regimes passed:** 0/4 (need 3)
 
-- **Rules:** `energy_momentum, energy_seasonality, death_cross`
-- **Profit Target:** 10%
-- **Min Confidence:** 0.5
-- **Max Loss:** 4.0%
-- **Cooldown:** 5 bars
+| Regime Window | Period | Return | Trades | Dominant | Status |
+|---------------|--------|--------|--------|----------|--------|
+| 2022 Bear (Rate Hike) | 2022-01-03 to 2022-10-14 | +0.0% | 0 | volatile | FAIL |
+| 2021 Bull (Low Rate Momentum) | 2021-01-04 to 2021-12-31 | +0.0% | 0 | bull | FAIL |
+| 2020 Crash + Recovery | 2020-02-19 to 2020-12-31 | -100.0% | 0 | error | FAIL |
+| 2023-2024 Choppy Transition | 2023-01-03 to 2024-06-30 | -16.1% | 3 | bull | FAIL |
 
-**Performance:** Return=-17.5%, Trades=17, WR=23.5%, Sharpe=-0.36, PF=0.49, DD=-35.7%
-
-| Gate | Status | Detail |
-|------|--------|--------|
-| Walk-Forward | FAIL | Train Sharpe=-1.83, Test Sharpe=0.87, Ratio=0% (need >=50%) |
-| Bootstrap | FAIL | p=0.7229, Sharpe CI=[-6.76, 2.33], WR CI=[11.8%, 52.9%] |
-| Monte Carlo | **PASS** | Ruin=0.0%, P95 DD=-37.8%, Median equity=$828, Survival=100.0% |
-| Regime | **PASS** | bull:13t/-4.7%, chop:2t/-3.0%, volatile:2t/-7.5% |
-
-**Result: 2/4 gates passed**
-
----
-
-### MC tune: max_loss=4.0% [multi-TF]
-
-- **Rules:** `energy_momentum, energy_seasonality, death_cross`
-- **Profit Target:** 10%
-- **Min Confidence:** 0.5
-- **Max Loss:** 4.0%
-- **Cooldown:** 5 bars
-
-**Performance:** Return=-24.1%, Trades=37, WR=43.2%, Sharpe=-0.63, PF=0.42, DD=-39.3%
-
-| Gate | Status | Detail |
-|------|--------|--------|
-| Walk-Forward | FAIL | Train Sharpe=-1.92, Test Sharpe=0.13, Ratio=0% (need >=50%) |
-| Bootstrap | FAIL | p=0.8647, Sharpe CI=[-4.23, 0.98], WR CI=[32.4%, 64.9%] |
-| Monte Carlo | **PASS** | Ruin=0.0%, P95 DD=-34.2%, Median equity=$795, Survival=100.0% |
-| Regime | **PASS** | bull:31t/-4.5%, bear:2t/-7.7%, chop:3t/-4.6%, volatile:1t/-4.1% |
-
-**Result: 2/4 gates passed**
+**Verdict: FRAGILE**
 
 ---
 
 ## 4. Summary Table
 
-| Config | WF | BS | MC | Regime | Sharpe | Return | Trades |
+| Config | WB | BS | MC | Regime | Sharpe | Return | Trades |
 |--------|-----|-----|-----|--------|--------|--------|--------|
-| **MC tune: max_loss=4.0%** | FAIL | FAIL | **PASS** | **PASS** | **-0.36** | **-17.5%** | 17 |
-| MC tune: max_loss=4.0% [multi-TF] | FAIL | FAIL | **PASS** | **PASS** | -0.63 | -24.1% | 37 |
-| MC tune: max_loss=3.0% | FAIL | FAIL | **PASS** | FAIL | -0.27 | -10.7% | 17 |
-| Alt F: upstream rules wider stops (10%/6%) | FAIL | FAIL | FAIL | **PASS** | -0.41 | -24.3% | 15 |
-| WF tune: PT=8% | FAIL | FAIL | FAIL | FAIL | -0.31 | -20.0% | 17 |
+| **WB tune: energy 14 rules** | FAIL | FAIL | FAIL | **PASS** | **-0.11** | **-9.2%** | 33 |
+| WB tune: stop=3.0% | FAIL | FAIL | **PASS** | FAIL | -0.12 | -5.6% | 20 |
+| Sector rules + 8% PT | FAIL | FAIL | **PASS** | FAIL | -0.26 | -17.6% | 20 |
+| WB tune: stop=6.0% | FAIL | FAIL | FAIL | FAIL | -0.25 | -17.8% | 17 |
 
 ---
 
 ## 5. Final Recommendation
 
-**COP partially validates.** Best config: MC tune: max_loss=4.0% (2/4 gates).
+**COP partially validates.** Best config: WB tune: energy 14 rules (1/4 gates).
 
-### MC tune: max_loss=4.0%
+### WB tune: energy 14 rules
 
-- **Rules:** `energy_momentum, energy_seasonality, death_cross`
-- **Profit Target:** 10%
+- **Rules:** `enhanced_buy_dip, momentum_reversal, trend_continuation, rsi_oversold, macd_bearish_crossover, trend_alignment, golden_cross, trend_break_warning, death_cross, seasonality, energy_momentum, energy_mean_reversion, energy_seasonality, midstream_yield_reversion`
+- **Profit Target:** 8%
 - **Min Confidence:** 0.5
 - **Max Loss:** 4.0%
-- **Cooldown:** 5 bars
+- **Cooldown:** 3 bars
 
-**Performance:** Return=-17.5%, Trades=17, WR=23.5%, Sharpe=-0.36, PF=0.49, DD=-35.7%
+**Performance:** Return=-9.2%, Trades=33, WR=36.4%, Sharpe=-0.11, PF=0.88, DD=-41.6%
 
 | Gate | Status | Detail |
 |------|--------|--------|
-| Walk-Forward | FAIL | Train Sharpe=-1.83, Test Sharpe=0.87, Ratio=0% (need >=50%) |
-| Bootstrap | FAIL | p=0.7229, Sharpe CI=[-6.76, 2.33], WR CI=[11.8%, 52.9%] |
-| Monte Carlo | **PASS** | Ruin=0.0%, P95 DD=-37.8%, Median equity=$828, Survival=100.0% |
-| Regime | **PASS** | bull:13t/-4.7%, chop:2t/-3.0%, volatile:2t/-7.5% |
+| Walk-Backward | FAIL | Verdict=REGIME_DEPENDENT, Holdout=PASS (+0.0%), Regimes=1/4 (need 3) | 2022 Bear (Rate Hike): +4.0% [PASS], 2021 Bull... |
+| Bootstrap | FAIL | p=0.5297, Sharpe CI=[-2.91, 2.28], WR CI=[21.2%, 51.5%] |
+| Monte Carlo | FAIL | Ruin=0.0%, P95 DD=-41.0%, Median=$941, Survival=100.0% |
+| Regime | **PASS** | bull:26t/-8.2%, bear:3t/-15.4%, chop:1t/+8.3%, volatile:3t/+15.3% |
 
-**Result: 2/4 gates passed**
+**Result: 1/4 gates passed**
+
+#### Walk-Backward Detail
+
+- **Tune period:** 2025-07-09 to 2026-01-05 (+0.0%, 0 trades)
+- **Holdout (forward):** 2026-01-06 to 2026-03-07 (+0.0%, 0 trades) **PASS**
+- **Regimes passed:** 1/4 (need 3)
+
+| Regime Window | Period | Return | Trades | Dominant | Status |
+|---------------|--------|--------|--------|----------|--------|
+| 2022 Bear (Rate Hike) | 2022-01-03 to 2022-10-14 | +4.0% | 1 | volatile | **PASS** |
+| 2021 Bull (Low Rate Momentum) | 2021-01-04 to 2021-12-31 | +0.0% | 0 | bull | FAIL |
+| 2020 Crash + Recovery | 2020-02-19 to 2020-12-31 | -100.0% | 0 | error | FAIL |
+| 2023-2024 Choppy Transition | 2023-01-03 to 2024-06-30 | -13.2% | 9 | bull | FAIL |
+
+**Verdict: REGIME_DEPENDENT**
 
 ---
 
 ### Deployment Recommendation
 
-- Conditional deployment with regime restrictions and/or reduced sizing
-- Monitor the failing gate(s) in live trading
+- Consider blacklisting or significant restrictions
+- Monitor failing gate(s) in live trading
 - Re-validate after 6 months of additional data
 
