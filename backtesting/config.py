@@ -6,6 +6,7 @@ Uses pydantic-settings for environment variable management.
 
 from datetime import date
 from typing import List, Optional
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -22,7 +23,7 @@ class Settings(BaseSettings):
     market_data_db_host: str = "localhost"
     market_data_db_port: int = 5433
     market_data_db_user: str = "ingestor"
-    market_data_db_password: str = "ingestor"
+    market_data_db_password: str = Field(..., description="Market data DB password (required)")
     market_data_db_name: str = "stock_db"
 
     # Default backtest parameters

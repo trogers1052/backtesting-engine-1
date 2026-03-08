@@ -7,6 +7,7 @@ from rich.table import Table
 from .bootstrap import BootstrapResult
 from .monte_carlo import MonteCarloResult
 from .regime import RegimeAnalysisResult
+from .walk_backward import WalkBackwardResult
 from .walk_forward import WalkForwardResult
 
 console = Console()
@@ -189,6 +190,106 @@ def print_regime_report(regime_result: RegimeAnalysisResult):
     else:
         console.print(
             "\n[bold green]Profit distributed across regimes[/bold green]"
+        )
+
+    console.print()
+
+
+def print_walk_backward_report(wb_result: WalkBackwardResult):
+    """Print hybrid walk-backward validation results."""
+    console.print()
+
+    verdict = wb_result.overall_verdict
+    if verdict == "ROBUST":
+        v_color = "green"
+    elif verdict == "REGIME_DEPENDENT":
+        v_color = "yellow"
+    else:
+        v_color = "red"
+
+    console.print(
+        Panel.fit(
+            f"[bold blue]Walk-Backward Validation: {wb_result.symbol}[/bold blue]  "
+            f"[bold {v_color}]{verdict}[/bold {v_color}]",
+            border_style="blue",
+        )
+    )
+    console.print()
+
+    # Tune + Holdout summary
+    tune_ret = wb_result.tune_result.total_return
+    tune_trades = wb_result.tune_result.total_trades
+    tune_sharpe = wb_result.tune_result.sharpe_ratio or 0.0
+    holdout_ret = wb_result.holdout_result.total_return
+    holdout_trades = wb_result.holdout_result.total_trades
+
+    tune_color = "green" if tune_ret > 0 else "red"
+    holdout_color = "green" if wb_result.holdout_passed else "red"
+    holdout_status = "PASS" if wb_result.holdout_passed else "FAIL"
+
+    console.print(
+        f"  [bold]Tune:[/bold]    {wb_result.tune_start} to {wb_result.tune_end}  "
+        f"[{tune_color}]{tune_ret:+.1%}[/{tune_color}]  "
+        f"{tune_trades} trades  Sharpe {tune_sharpe:.2f}"
+    )
+    console.print(
+        f"  [bold]Holdout:[/bold] {wb_result.holdout_start} to {wb_result.holdout_end}  "
+        f"[{holdout_color}]{holdout_ret:+.1%}[/{holdout_color}]  "
+        f"{holdout_trades} trades  "
+        f"[{holdout_color}]{holdout_status}[/{holdout_color}]"
+    )
+    console.print()
+
+    # Regime windows table
+    table = Table(show_header=True, header_style="bold cyan")
+    table.add_column("Regime Window", style="bold")
+    table.add_column("Period")
+    table.add_column("Dominant", justify="center")
+    table.add_column("Return", justify="right")
+    table.add_column("Trades", justify="right")
+    table.add_column("Win Rate", justify="right")
+    table.add_column("Sharpe", justify="right")
+    table.add_column("Status", justify="center")
+
+    for w in wb_result.regime_windows:
+        ret_color = "green" if w.total_return > 0 else "red"
+        status = "[green]PASS[/green]" if w.passed else "[red]FAIL[/red]"
+        sharpe = w.sharpe or 0.0
+        win_rate = w.result.win_rate if w.result.total_trades > 0 else 0.0
+
+        table.add_row(
+            w.label,
+            f"{w.start} to {w.end}",
+            w.actual_dominant_regime.upper(),
+            f"[{ret_color}]{w.total_return:+.1%}[/{ret_color}]",
+            str(w.total_trades),
+            f"{win_rate:.0%}" if w.total_trades > 0 else "-",
+            f"{sharpe:.2f}",
+            status,
+        )
+
+    console.print(table)
+
+    # Verdict
+    console.print(
+        f"\n  Regimes passed: {wb_result.regimes_passed}/{wb_result.regimes_total} "
+        f"(minimum: {wb_result.min_regimes_pass})"
+    )
+
+    if verdict == "ROBUST":
+        console.print(
+            "\n[bold green]Rules tuned to recent data survive across historical regimes. "
+            "Strategy is robust.[/bold green]"
+        )
+    elif verdict == "REGIME_DEPENDENT":
+        console.print(
+            "\n[bold yellow]WARNING: Rules work in some regimes but not others. "
+            "Consider regime-gating this strategy.[/bold yellow]"
+        )
+    else:
+        console.print(
+            "\n[bold red]FRAGILE: Rules tuned to recent data fail in historical regimes "
+            "or on unseen recent data. Likely overfit to current conditions.[/bold red]"
         )
 
     console.print()

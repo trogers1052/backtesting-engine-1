@@ -350,6 +350,31 @@ Examples:
         help="Days to trim from end of training to prevent trade overlap with test (default: 10)",
     )
 
+    # Walk-backward arguments
+    parser.add_argument(
+        "--walk-backward",
+        action="store_true",
+        help="Hybrid walk-backward validation: tune on recent data, validate against historical regimes",
+    )
+    parser.add_argument(
+        "--tune-months",
+        type=int,
+        default=12,
+        help="Months of recent data to tune rules on (default: 12)",
+    )
+    parser.add_argument(
+        "--holdout-months",
+        type=int,
+        default=2,
+        help="Most recent months to hold out as unseen test data (default: 2)",
+    )
+    parser.add_argument(
+        "--min-regimes-pass",
+        type=int,
+        default=3,
+        help="Minimum historical regime windows that must pass (default: 3)",
+    )
+
     # Monte Carlo arguments
     parser.add_argument(
         "--monte-carlo",
@@ -516,6 +541,26 @@ Examples:
                     ruin_threshold_pct=args.mc_ruin_pct,
                 )
                 print_monte_carlo_report(mc_result)
+
+            if args.walk_backward:
+                from .validation import WalkBackwardValidator
+                from .validation.report import print_walk_backward_report
+
+                wb_kwargs = {
+                    k: v for k, v in run_kwargs.items()
+                    if k not in ("start_date", "end_date")
+                }
+                wb_validator = WalkBackwardValidator(runner)
+                wb_result = wb_validator.validate(
+                    symbols[0],
+                    data_start=args.start,
+                    data_end=args.end,
+                    tune_months=args.tune_months,
+                    holdout_months=args.holdout_months,
+                    min_regimes_pass=args.min_regimes_pass,
+                    **wb_kwargs,
+                )
+                print_walk_backward_report(wb_result)
 
         else:
             # Multiple symbols — run individually so we can check for
