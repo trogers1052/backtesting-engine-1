@@ -26,6 +26,13 @@ class Settings(BaseSettings):
     market_data_db_password: str = Field(..., description="Market data DB password (required)")
     market_data_db_name: str = "stock_db"
 
+    # Trading Platform Database (PostgreSQL on Pi — profiles, audit, patterns)
+    trading_db_host: str = "192.168.105.247"
+    trading_db_port: int = 5432
+    trading_db_user: str = "trader"
+    trading_db_password: str = Field(..., description="Trading platform DB password (required)")
+    trading_db_name: str = "trading_platform"
+
     # Default backtest parameters
     default_timeframe: str = "daily"  # 1min, 5min, 15min, 30min, 1hour, 4hour, daily
     default_exit_timeframe: Optional[str] = None  # None = single-timeframe; "5min" enables multi-TF
@@ -34,7 +41,7 @@ class Settings(BaseSettings):
 
     # Strategy defaults
     default_initial_cash: float = 100000.0
-    default_commission: float = 0.001  # 0.1% commission
+    default_commission: float = 0.0  # Robinhood: $0 stock commissions
     default_profit_target: float = 0.07  # 7%
     default_stop_loss: float = 0.05  # 5%
     default_min_confidence: float = 0.6

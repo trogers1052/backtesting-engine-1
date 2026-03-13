@@ -14,6 +14,7 @@ Usage:
 import argparse
 import json
 import logging
+import os
 import sys
 from datetime import date, datetime
 from urllib.parse import urlencode
@@ -27,16 +28,16 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-FRED_API_KEY = "REDACTED_API_KEY"
+FRED_API_KEY = os.environ.get("FRED_API_KEY", "")
 FRED_SERIES = "VIXCLS"
 FRED_URL = "https://api.stlouisfed.org/fred/series/observations"
 
-# Database defaults (match backtesting config.py)
-DB_HOST = "localhost"
-DB_PORT = 5433
-DB_USER = "ingestor"
+# Database defaults from environment (never hardcode credentials)
+DB_HOST = os.environ.get("DB_HOST", "localhost")
+DB_PORT = int(os.environ.get("DB_PORT", "5433"))
+DB_USER = os.environ.get("DB_USER", "ingestor")
 DB_PASSWORD = os.environ.get("DB_PASSWORD", "")
-DB_NAME = "stock_db"
+DB_NAME = os.environ.get("DB_NAME", "stock_db")
 
 
 def fetch_vix_from_fred(
