@@ -15,10 +15,10 @@ jobs:
 
     steps:
       - name: Checkout backtesting-service
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Checkout decision-engine
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: trogers1052/decision-engine
           path: decision_engine
@@ -55,10 +55,10 @@ jobs:
 
     steps:
       - name: Checkout backtesting-service
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Checkout decision-engine
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: trogers1052/decision-engine
           path: decision_engine
