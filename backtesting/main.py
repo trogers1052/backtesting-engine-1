@@ -413,9 +413,9 @@ Examples:
         print("\nAvailable Symbols in Database:")
         print("=" * 40)
         for sym in symbols:
-            min_date, max_date, count = loader.get_date_range(sym)
+            min_date, max_date, _ = loader.get_date_range(sym)
             if min_date:
-                print(f"  {sym}: {min_date.date()} to {max_date.date()} ({count} bars)")
+                print(f"  {sym}: {min_date.date()} to {max_date.date()}")
             else:
                 print(f"  {sym}: No data")
         print()

@@ -163,22 +163,16 @@ def verify_data() -> None:
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT
-                    MIN(time) as first_date,
-                    MAX(time) as last_date,
-                    COUNT(*) as total_rows,
-                    MIN(close) as min_vix,
-                    MAX(close) as max_vix,
-                    AVG(close) as avg_vix
-                FROM ohlcv_1min
+                    backfill_start as first_date,
+                    backfill_end as last_date
+                FROM backfill_status
                 WHERE symbol = 'VIX';
             """)
             row = cur.fetchone()
 
         if row and row[0]:
             logger.info(
-                f"VIX data in DB: {row[0].date()} to {row[1].date()} | "
-                f"{row[2]} rows | "
-                f"min={row[3]:.2f} max={row[4]:.2f} avg={row[5]:.2f}"
+                f"VIX data in DB: {row[0].date()} to {row[1].date()}"
             )
         else:
             logger.warning("No VIX data found in database")

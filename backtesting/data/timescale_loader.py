@@ -142,10 +142,15 @@ class TimescaleLoader:
                 conn.close()
 
     def get_available_symbols(self) -> list:
-        """Get list of symbols available in the database."""
+        """Get list of symbols available in the database.
+
+        Uses monitored_symbols table instead of scanning ohlcv_1min
+        (which would plan across all 2,000+ chunks).
+        """
         query = """
-            SELECT DISTINCT symbol
-            FROM ohlcv_1min
+            SELECT symbol
+            FROM monitored_symbols
+            WHERE enabled = true
             ORDER BY symbol;
         """
 
@@ -163,13 +168,16 @@ class TimescaleLoader:
                 conn.close()
 
     def get_date_range(self, symbol: str) -> tuple:
-        """Get available date range for a symbol."""
+        """Get available date range for a symbol.
+
+        Uses backfill_status metadata instead of scanning ohlcv_1min
+        (MIN/MAX/COUNT across all chunks is extremely expensive).
+        """
         query = """
             SELECT
-                MIN(time) as min_date,
-                MAX(time) as max_date,
-                COUNT(*) as bar_count
-            FROM ohlcv_1min
+                backfill_start as min_date,
+                backfill_end as max_date
+            FROM backfill_status
             WHERE symbol = %s;
         """
 
@@ -181,7 +189,7 @@ class TimescaleLoader:
                 row = cur.fetchone()
 
             if row and row["min_date"]:
-                return (row["min_date"], row["max_date"], row["bar_count"])
+                return (row["min_date"], row["max_date"], 0)
             return (None, None, 0)
 
         except Exception as e:
