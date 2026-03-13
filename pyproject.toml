@@ -10,7 +10,7 @@ requires-python = ">=3.10"
 dependencies = [
     "backtrader2>=1.9.76",
     "pandas>=2.0.0",
-    "numpy>=1.24.0,<2.0.0",
+    "numpy>=1.24.0,<3.0.0",
     "ta>=0.10.0",
     "psycopg2-binary>=2.9.0",
     "pydantic>=2.0.0",
