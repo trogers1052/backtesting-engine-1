@@ -276,6 +276,7 @@ def run_integrity_checks(
     df: pd.DataFrame,
     end_date: Optional[date] = None,
     df_secondary: Optional[pd.DataFrame] = None,
+    skip_gap_check: bool = False,
 ) -> IntegrityReport:
     """Run all applicable data integrity checks.
 
@@ -283,6 +284,8 @@ def run_integrity_checks(
         df: Primary data feed (DataFrame with DatetimeIndex).
         end_date: Expected end date for future-data check.
         df_secondary: Secondary feed for multi-timeframe alignment check.
+        skip_gap_check: Skip gap detection (for intraday data where
+            overnight/weekend gaps are expected).
 
     Returns:
         IntegrityReport with results of all checks.
@@ -295,7 +298,8 @@ def run_integrity_checks(
     if end_date is not None:
         report.checks.append(check_no_future_data(df, end_date))
 
-    report.checks.append(check_no_gaps(df))
+    if not skip_gap_check:
+        report.checks.append(check_no_gaps(df))
     report.checks.append(check_indicator_completeness(df))
 
     if df_secondary is not None:

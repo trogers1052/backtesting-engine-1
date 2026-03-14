@@ -373,6 +373,10 @@ class BacktraderRunner:
         )
         return result
 
+    def clear_indicator_cache(self):
+        """Clear any cached data (no-op — reserved for future use)."""
+        pass
+
     def run_multiple(
         self,
         symbols: List[str],
