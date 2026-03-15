@@ -337,16 +337,19 @@ def _compute_rule_confidence(
         conf[mask] = 0.55
 
     elif rule_name == "seasonality":
-        # Mining seasonality: strong months + RSI < 50 + uptrend
+        # Mining SeasonalityRule: uptrend + RSI 25-70
+        # Fires on strong + neutral months. Weak months BLOCKED.
+        # Gold/silver: strong=[1,2,8,9,11,12], weak=[5,6]
         month = df.index.month
         strong_months = month.isin([1, 2, 8, 9, 11, 12])
+        weak = month.isin([5, 6])
         uptrend = sma20 > sma50
-        mask = strong_months & (rsi >= 25) & (rsi <= 70) & uptrend
-        conf[mask] = 0.55
-        conf[mask & (rsi < 40)] += 0.10
+        mask = uptrend & (rsi >= 25) & (rsi <= 70) & ~weak
+        conf[mask] = 0.55  # base for neutral months
+        conf[mask & strong_months] += 0.10  # strong month boost
         spread = safe_spread(sma20, sma50)
         conf[mask & (spread > 2)] += 0.05
-        conf = conf.clip(0, 0.85)
+        conf = conf.clip(0.40, 0.85)
 
     elif rule_name == "volume_breakout":
         # VolumeBreakoutRule: vol >= 1.5x + close > SMA_20
@@ -391,14 +394,16 @@ def _compute_rule_confidence(
         conf = conf.clip(0.40, 0.85)
 
     elif rule_name == "energy_seasonality":
-        # EnergySeasonalityRule: uptrend + RSI 25-70 + strong month
+        # EnergySeasonalityRule: uptrend + RSI 25-70
+        # Fires on strong + neutral months. Weak months BLOCKED (no new entries).
+        # Strong months vary by subsector; using integrated/upstream defaults.
         month = df.index.month
-        strong = month.isin([10, 11, 12, 1, 2])
-        weak = month.isin([5, 6])
+        strong = month.isin([1, 2, 5, 6, 7, 8, 9, 11, 12])
+        weak = month.isin([3, 4, 10])
         uptrend = sma20 > sma50
-        mask = uptrend & (rsi >= 25) & (rsi <= 70) & (strong | weak)
-        conf[mask & strong] = 0.65
-        conf[mask & weak] = 0.40
+        mask = uptrend & (rsi >= 25) & (rsi <= 70) & ~weak
+        conf[mask] = 0.55  # base for neutral months
+        conf[mask & strong] += 0.10  # strong month boost
         spread = safe_spread(sma20, sma50)
         conf[mask & (spread > 2)] += 0.05
         conf = conf.clip(0.40, 0.85)
@@ -421,9 +426,10 @@ def _compute_rule_confidence(
 
     # ── Defense Rules ──
     elif rule_name == "defense_momentum":
-        # DefenseMomentumRule: golden cross + close > SMA_50 + ADX >= 20
-        # + MACD_HIST > 0 + RSI 40-72 + vol >= 0.7x
-        mask = ((sma50 > sma200) & (close > sma50) & (adx >= 20) &
+        # DefenseMomentumRule: golden cross + close > SMA_50 + close > SMA_200
+        # + uptrend + ADX >= 20 + MACD_HIST > 0 + RSI 40-72 + vol >= 0.7x
+        mask = ((sma50 > sma200) & (close > sma50) & (close > sma200) &
+                (sma20 > sma50) & (adx >= 20) &
                 (macd_hist > 0) & (rsi >= 40) & (rsi <= 72) & (vol_r >= 0.7))
         conf[mask] = 0.55
         conf[mask & (adx > 30)] += 0.10
@@ -517,14 +523,16 @@ def _compute_rule_confidence(
         conf = conf.clip(0.40, 0.85)
 
     elif rule_name == "industrial_seasonality":
-        # IndustrialSeasonalityRule: strong months + uptrend + RSI 25-70
+        # IndustrialSeasonalityRule: uptrend + RSI 25-70
+        # Fires on strong + neutral months. Weak months BLOCKED.
+        # Strong=[10,11,12,1], Weak=[5,6]
         month = df.index.month
         strong = month.isin([10, 11, 12, 1])
         weak = month.isin([5, 6])
         uptrend = sma20 > sma50
-        mask = uptrend & (rsi >= 25) & (rsi <= 70) & (strong | weak)
-        conf[mask & strong] = 0.65
-        conf[mask & weak] = 0.40
+        mask = uptrend & (rsi >= 25) & (rsi <= 70) & ~weak
+        conf[mask] = 0.55  # base for neutral months
+        conf[mask & strong] += 0.10  # strong month boost
         spread = safe_spread(sma20, sma50)
         conf[mask & (spread > 2)] += 0.05
         conf = conf.clip(0.40, 0.85)
@@ -564,33 +572,42 @@ def _compute_rule_confidence(
         conf = conf.clip(0, 0.85)
 
     elif rule_name == "tech_seasonality":
-        # TechSeasonalityRule: strong months + uptrend + RSI 30-70
+        # TechSeasonalityRule: uptrend + RSI 30-70
+        # Fires on strong + neutral months. Weak months BLOCKED.
+        # Using semi_equip defaults: strong=[1,2,3,10,11,12], weak=[5,6,7]
         month = df.index.month
-        strong = month.isin([10, 11, 1, 4])
-        weak = month.isin([6, 7, 8, 9])
+        strong = month.isin([1, 2, 3, 10, 11, 12])
+        weak = month.isin([5, 6, 7])
         uptrend = sma20 > sma50
-        mask = uptrend & (rsi >= 30) & (rsi <= 70) & (strong | weak)
-        conf[mask & strong] = 0.65
-        conf[mask & weak] = 0.40
+        mask = uptrend & (rsi >= 30) & (rsi <= 70) & ~weak
+        conf[mask] = 0.55  # base for neutral months
+        conf[mask & strong] += 0.10  # strong month boost
         spread = safe_spread(sma20, sma50)
         conf[mask & (spread > 2)] += 0.05
         conf = conf.clip(0.40, 0.85)
 
     elif rule_name == "semi_cycle":
-        # SemiCycleRule: golden cross + ADX >= 15 + near SMA_50 or EMA_21
-        # + close > SMA_200 + RSI in range + vol >= 0.8x + MACD_HIST >= -1.0
+        # SemiCycleRule: only for semi_equip/memory subsectors
+        # golden cross + ADX >= 15 + near SMA_50 or EMA_21
+        # + close > SMA_200 + RSI 25-45 (semi_equip threshold ~35)
+        # + vol >= 0.8x + MACD_HIST >= -1.0
+        rsi_threshold = 35  # semi_equip default
         near_ema21 = (dist_pct(close, ema21).abs()) <= 2.0 if ema21 is not None else False
         near_sma50_semi = (dist_pct(close, sma50).abs()) <= 3.0
         near_support = near_ema21 | near_sma50_semi
         macd_ok = (macd_hist >= -1.0) if macd_hist is not None else True
         mask = ((sma50 > sma200) & (adx >= 15) & near_support &
-                (close > sma200) & (rsi >= 30) & (rsi <= 50) &
+                (close > sma200) & (rsi >= rsi_threshold - 10) &
+                (rsi <= rsi_threshold + 15) &
                 (vol_r >= 0.8) & macd_ok)
         conf[mask] = 0.55
-        conf[mask & near_ema21 & (dist_pct(close, ema21).abs() < 1.0)] += 0.10
-        conf[mask & near_sma50_semi & (dist_pct(close, sma50).abs() < 1.5)] += 0.10
-        conf[mask & (rsi < 35)] += 0.10
-        conf[mask & (rsi >= 35) & (rsi < 40)] += 0.05
+        if ema21 is not None:
+            ema_dist = dist_pct(close, ema21).abs()
+            conf[mask & near_ema21 & (ema_dist < 1.0)] += 0.10
+        sma50_dist = dist_pct(close, sma50).abs()
+        conf[mask & near_sma50_semi & (sma50_dist < 1.5)] += 0.10
+        conf[mask & (rsi < rsi_threshold)] += 0.10
+        conf[mask & (rsi >= rsi_threshold) & (rsi < rsi_threshold + 5)] += 0.05
         conf[mask & (macd_hist > 0)] += 0.05
         conf[mask & (vol_r > 1.5)] += 0.05
         conf = conf.clip(0.40, 0.85)
@@ -628,14 +645,16 @@ def _compute_rule_confidence(
         conf = conf.clip(0.40, 0.85)
 
     elif rule_name == "financial_seasonality":
-        # FinancialSeasonalityRule: strong months + uptrend + RSI 25-70
+        # FinancialSeasonalityRule: uptrend + RSI 25-70
+        # Fires on strong + neutral months. Weak months BLOCKED.
+        # Strong=[10,11,12,1], Weak=[5,6]
         month = df.index.month
         strong = month.isin([10, 11, 12, 1])
         weak = month.isin([5, 6])
         uptrend = sma20 > sma50
-        mask = uptrend & (rsi >= 25) & (rsi <= 70) & (strong | weak)
-        conf[mask & strong] = 0.65
-        conf[mask & weak] = 0.40
+        mask = uptrend & (rsi >= 25) & (rsi <= 70) & ~weak
+        conf[mask] = 0.55  # base for neutral months
+        conf[mask & strong] += 0.10  # strong month boost
         spread = safe_spread(sma20, sma50)
         conf[mask & (spread > 2)] += 0.05
         conf = conf.clip(0.40, 0.85)
@@ -675,24 +694,32 @@ def _compute_rule_confidence(
         conf = conf.clip(0.40, 0.85)
 
     elif rule_name == "utility_seasonality":
-        # UtilitySeasonalityRule: strong months (May-Sep) + uptrend + RSI 25-70
+        # UtilitySeasonalityRule: uptrend + RSI 25-65
+        # Fires on strong + neutral months. Weak months BLOCKED.
+        # Using nuclear_power defaults: strong=[1,2,10,11,12], weak=[5,6,9]
+        # Regulated defaults: strong=[3,7,10], weak=[2,9]
+        # Compromise: strong=[1,2,3,7,10,11,12], weak=[5,6,9]
         month = df.index.month
-        strong = month.isin([5, 6, 7, 8, 9])
+        strong = month.isin([1, 2, 3, 7, 10, 11, 12])
+        weak = month.isin([5, 6, 9])
         uptrend = sma20 > sma50
-        mask = uptrend & (rsi >= 25) & (rsi <= 70) & strong
-        conf[mask] = 0.65
+        mask = uptrend & (rsi >= 25) & (rsi <= 65) & ~weak
+        conf[mask] = 0.55  # base for neutral months
+        conf[mask & strong] += 0.10  # strong month boost
         spread = safe_spread(sma20, sma50)
-        conf[mask & (spread > 2)] += 0.05
+        conf[mask & (spread > 1.5)] += 0.05
         conf = conf.clip(0.40, 0.85)
 
     elif rule_name == "nuclear_power_momentum":
         # NuclearPowerMomentumRule: EMA_21 > SMA_50 > SMA_200 + close > SMA_50
-        # + within -6% to +3% of EMA_21 + RSI 30-70 + vol >= 0.6x
+        # + ADX >= 20 + within -6% to +3% of EMA_21 + RSI 30-70 + vol >= 0.6x
         # + (MACD > signal or MACD_HIST > -0.5)
         ema_align = (ema21 > sma50) & (sma50 > sma200) if ema21 is not None else False
         dist_ema = dist_pct(close, ema21) if ema21 is not None else pd.Series(99, index=df.index)
         macd_ok = (macd > macd_sig) | (macd_hist > -0.5) if macd is not None else True
-        mask = (ema_align & (close > sma50) & (dist_ema >= -6.0) & (dist_ema <= 3.0) &
+        adx_ok = (adx >= 20) if adx is not None else True
+        mask = (ema_align & (close > sma50) & adx_ok &
+                (dist_ema >= -6.0) & (dist_ema <= 3.0) &
                 (rsi >= 30) & (rsi <= 70) & (vol_r >= 0.6) & macd_ok)
         conf[mask] = 0.55
         conf[mask & (dist_ema.abs() < 1)] += 0.10
@@ -740,12 +767,16 @@ def _compute_rule_confidence(
         conf = conf.clip(0.40, 0.85)
 
     elif rule_name == "consumer_staples_seasonality":
-        # ConsumerStaplesSeasonalityRule: strong months (Sep-Dec) + uptrend + RSI 25-70
+        # ConsumerStaplesSeasonalityRule: uptrend + RSI 25-70
+        # Fires on strong + neutral months. Weak months BLOCKED.
+        # Strong=[9,10,11,12], Weak=[3,4,5]
         month = df.index.month
         strong = month.isin([9, 10, 11, 12])
+        weak = month.isin([3, 4, 5])
         uptrend = sma20 > sma50
-        mask = uptrend & (rsi >= 25) & (rsi <= 70) & strong
-        conf[mask] = 0.65
+        mask = uptrend & (rsi >= 25) & (rsi <= 70) & ~weak
+        conf[mask] = 0.55  # base for neutral months
+        conf[mask & strong] += 0.10  # strong month boost
         spread = safe_spread(sma20, sma50)
         conf[mask & (spread > 2)] += 0.05
         conf = conf.clip(0.40, 0.85)
@@ -785,14 +816,16 @@ def _compute_rule_confidence(
         conf = conf.clip(0.40, 0.85)
 
     elif rule_name == "healthcare_seasonality":
-        # HealthcareSeasonalityRule: strong months + uptrend + RSI 25-70
+        # HealthcareSeasonalityRule: uptrend + RSI 25-70
+        # Fires on strong + neutral months. Weak months BLOCKED.
+        # Strong=[10,11,1,4], Weak=[6,7,8]
         month = df.index.month
         strong = month.isin([10, 11, 1, 4])
         weak = month.isin([6, 7, 8])
         uptrend = sma20 > sma50
-        mask = uptrend & (rsi >= 25) & (rsi <= 70) & (strong | weak)
-        conf[mask & strong] = 0.65
-        conf[mask & weak] = 0.40
+        mask = uptrend & (rsi >= 25) & (rsi <= 70) & ~weak
+        conf[mask] = 0.55  # base for neutral months
+        conf[mask & strong] += 0.10  # strong month boost
         spread = safe_spread(sma20, sma50)
         conf[mask & (spread > 2)] += 0.05
         conf = conf.clip(0.40, 0.85)
