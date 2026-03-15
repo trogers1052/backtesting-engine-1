@@ -87,70 +87,126 @@ def _compute_rule_confidence(
             result = (a - b) / b * 100
         return result.fillna(0)
 
+    # Helper: volume ratio (reused across rules)
+    def vol_ratio_series():
+        if vol_sma is not None and volume is not None:
+            vr = volume / vol_sma.replace(0, np.nan)
+            return vr.fillna(0)
+        return pd.Series(1.0, index=df.index)
+
+    vol_r = vol_ratio_series()
+
+    # Helper: distance from a reference price as %
+    def dist_pct(price, ref):
+        with np.errstate(divide="ignore", invalid="ignore"):
+            result = (price - ref) / ref * 100
+        return result.fillna(0) if isinstance(result, pd.Series) else result
+
     # ── RSI Rules ──
     if rule_name == "rsi_oversold":
+        # RSIOversoldRule: RSI < 30, confidence 0.5 at 30, 0.9 at 20
         mask = rsi < 30
-        conf[mask] = 0.5 + (30 - rsi[mask]) / 25  # 0.5 at RSI=30, 0.9 at RSI=20
+        conf[mask] = 0.5 + (30 - rsi[mask]) / 25
         conf = conf.clip(0, 0.9)
 
     elif rule_name == "rsi_overbought":
-        # SELL signal — return negative confidence to distinguish
-        mask = rsi > 70
-        conf[mask] = -(0.4 + (rsi[mask] - 70) / 33.3)
+        # RSIOverboughtRule: SELL if RSI >= 80 (-0.85), WATCH if 70-80
+        mask_sell = rsi >= 80
+        mask_watch = (rsi > 70) & (rsi < 80)
+        conf[mask_sell] = -0.85
+        conf[mask_watch] = -(0.4 + (rsi[mask_watch] - 70) / 33.3)
         conf = conf.clip(-0.85, 0)
 
     elif rule_name == "rsi_approaching_oversold":
+        # RSIApproachingOversoldRule: WATCH, RSI 30-40, flat 0.40
         mask = (rsi >= 30) & (rsi <= 40)
-        conf[mask] = 0.4  # WATCH signal
+        conf[mask] = 0.4
 
     # ── MACD Rules ──
     elif rule_name == "macd_bullish_crossover":
+        # MACDBullishCrossoverRule: MACD > signal
+        # Fresh (0 < hist < 0.1): 0.65 + |hist|*3 (max 0.85)
+        # Old (hist >= 0.1): 0.50
         mask = macd > macd_sig
-        hist_fresh = macd_hist.abs() < 0.1
-        conf[mask & hist_fresh] = 0.65
-        conf[mask & ~hist_fresh] = 0.5
+        hist_fresh = (macd_hist > 0) & (macd_hist < 0.1)
+        conf[mask & hist_fresh] = (0.65 + macd_hist[mask & hist_fresh].abs() * 3).clip(0, 0.85)
+        conf[mask & ~hist_fresh] = 0.50
 
     elif rule_name == "macd_bearish_crossover":
+        # MACDBearishCrossoverRule: MACD < signal, WATCH signal
+        # Fresh (-0.1 < hist < 0): -0.60 - |hist|*3 (max -0.80)
+        # Old (hist <= -0.1): -0.50
         mask = macd < macd_sig
-        conf[mask] = -0.5  # SELL/WATCH
+        hist_fresh = (macd_hist < 0) & (macd_hist > -0.1)
+        conf[mask & hist_fresh] = -(0.60 + macd_hist[mask & hist_fresh].abs() * 3).clip(0, 0.80)
+        conf[mask & ~hist_fresh] = -0.50
 
     elif rule_name == "macd_momentum":
-        mask = macd_hist > 0.05
-        conf[mask] = np.minimum(0.5 + macd_hist[mask] * 2, 0.7)
+        # MACDMomentumRule: |hist| > 0.05
+        # Positive hist: BUY, min(0.40 + hist*2, 0.70)
+        # Negative hist: WATCH (negative confidence)
+        mask_buy = macd_hist > 0.05
+        mask_sell = macd_hist < -0.05
+        conf[mask_buy] = np.minimum(0.40 + macd_hist[mask_buy] * 2, 0.70)
+        conf[mask_sell] = -np.minimum(0.40 + macd_hist[mask_sell].abs() * 2, 0.70)
 
     # ── Trend Rules ──
     elif rule_name == "weekly_uptrend":
+        # WeeklyUptrendRule: WATCH signal, SMA_20 > SMA_50
         mask = sma20 > sma50
         spread = safe_spread(sma20, sma50)
-        conf[mask] = 0.55
-        conf[mask & (spread >= 1)] = 0.7
         conf[mask & (spread >= 2)] = 0.85
+        conf[mask & (spread >= 1) & (spread < 2)] = 0.70
+        conf[mask & (spread < 1)] = 0.55
 
     elif rule_name == "monthly_uptrend":
+        # MonthlyUptrendRule: WATCH signal, SMA_50 > SMA_200
         mask = sma50 > sma200
         spread = safe_spread(sma50, sma200)
-        conf[mask] = 0.55
-        conf[mask & (spread >= 1)] = 0.7
-        conf[mask & (spread >= 2)] = 0.85
+        conf[mask & (spread >= 5)] = 0.85
+        conf[mask & (spread >= 2) & (spread < 5)] = 0.70
+        conf[mask & (spread < 2)] = 0.55
 
     elif rule_name == "trend_alignment":
-        mask = (sma20 > sma50) & (sma50 > sma200)
-        conf[mask] = 0.75
+        # FullTrendAlignmentRule: SMA_20 > SMA_50 > SMA_200
+        # Confidence: 0.6 + total_spread/30, capped 0.95
+        # Volume gate: < 0.5x = no signal, < 0.8x = -0.10 penalty
+        aligned = (sma20 > sma50) & (sma50 > sma200)
+        spread_20_50 = safe_spread(sma20, sma50)
+        spread_50_200 = safe_spread(sma50, sma200)
+        total_spread = spread_20_50 + spread_50_200
+        conf[aligned] = (0.6 + total_spread[aligned] / 30).clip(0.5, 0.95)
+        conf[aligned & (vol_r < 0.5)] = 0.0
+        conf[aligned & (vol_r >= 0.5) & (vol_r < 0.8)] -= 0.10
+        conf = conf.clip(0, 0.95)
 
     elif rule_name == "golden_cross":
+        # GoldenCrossRule: SMA_50 > SMA_200
+        # Fresh (spread < 1%): 0.75, Old (spread >= 1%): 0.50
         mask = (sma50 > sma200)
-        conf[mask] = 0.65
+        spread = safe_spread(sma50, sma200)
+        conf[mask & (spread < 1.0)] = 0.75
+        conf[mask & (spread >= 1.0)] = 0.50
 
     elif rule_name == "death_cross":
+        # DeathCrossRule: SELL, SMA_50 < SMA_200
+        # Fresh (spread < 1%): -0.75, Old: -0.60
         mask = (sma50 < sma200)
-        conf[mask] = -0.6
+        spread = safe_spread(sma200, sma50)
+        conf[mask & (spread < 1.0)] = -0.75
+        conf[mask & (spread >= 1.0)] = -0.60
 
     elif rule_name == "trend_break_warning":
+        # TrendBreakWarningRule: SELL, SMA_20 < SMA_50
+        # Fresh (spread < 0.5%): -0.70, Old: -0.60
         mask = (sma20 < sma50)
-        conf[mask] = -0.55
+        spread = safe_spread(sma50, sma20)
+        conf[mask & (spread < 0.5)] = -0.70
+        conf[mask & (spread >= 0.5)] = -0.60
 
     # ── Composite Rules ──
     elif rule_name == "buy_dip_in_uptrend":
+        # BuyDipInUptrendRule: SMA_20 > SMA_50, RSI < 40
         uptrend = sma20 > sma50
         spread = safe_spread(sma20, sma50)
         dip = rsi < 40
@@ -158,24 +214,26 @@ def _compute_rule_confidence(
         conf[mask & (rsi < 30)] = 0.85
         conf[mask & (rsi >= 30) & (rsi < 35)] = 0.70
         conf[mask & (rsi >= 35) & (rsi < 40)] = 0.55
-        # Trend spread bonus
         conf[mask & (spread >= 2)] += 0.10
         conf[mask & (spread >= 1) & (spread < 2)] += 0.05
         conf = conf.clip(0, 0.95)
 
     elif rule_name == "strong_buy_signal":
+        # StrongBuySignalRule: full alignment + RSI < 35
         full_align = (sma20 > sma50) & (sma50 > sma200)
         dip = rsi < 35
         mask = full_align & dip
         conf[mask & (rsi < 25)] = 0.90
         conf[mask & (rsi >= 25) & (rsi < 30)] = 0.80
         conf[mask & (rsi >= 30) & (rsi < 35)] = 0.70
-        # Trend strength bonus
-        spread = safe_spread(sma20, sma50)
-        conf[mask & (spread >= 2)] += 0.10
+        spread_20_50 = safe_spread(sma20, sma50)
+        spread_50_200 = safe_spread(sma50, sma200)
+        total_spread = spread_20_50 + spread_50_200
+        conf[mask] += (total_spread[mask] / 50).clip(0, 0.10)
         conf = conf.clip(0, 0.98)
 
     elif rule_name == "rsi_macd_confluence":
+        # RSIAndMACDConfluenceRule: RSI < 35 AND MACD > signal
         mask = (rsi < 35) & (macd > macd_sig)
         conf[mask] = 0.70
         conf[mask & (rsi < 30)] += 0.15
@@ -184,230 +242,560 @@ def _compute_rule_confidence(
         conf = conf.clip(0, 0.95)
 
     elif rule_name == "dip_recovery":
+        # TrendDipRecoveryRule: uptrend + RSI 30-45
         uptrend = sma20 > sma50
         recovery = (rsi >= 30) & (rsi <= 45)
         mask = uptrend & recovery
-        conf[mask] = 0.55 + (45 - rsi[mask]) / 30
-        conf = conf.clip(0, 0.75)
+        conf[mask] = (0.55 + (45 - rsi[mask]) / 30).clip(0, 0.75)
 
     # ── Enhanced Rules ──
     elif rule_name == "enhanced_buy_dip":
+        # EnhancedBuyDipRule: uptrend + spread >= 1.5% + RSI < 35 + close > SMA_200 + vol >= 0.8x
         uptrend = sma20 > sma50
         spread = safe_spread(sma20, sma50)
         above_200 = close > sma200
         dip = rsi < 35
-        mask = uptrend & (spread >= 1.5) & dip & above_200
-        # RSI score
+        mask = uptrend & (spread >= 1.5) & dip & above_200 & (vol_r >= 0.8)
         rsi_score = pd.Series(0.0, index=df.index)
         rsi_score[rsi < 30] = 0.40
         rsi_score[(rsi >= 30) & (rsi < 33)] = 0.30
         rsi_score[(rsi >= 33) & (rsi < 35)] = 0.20
-        # Trend score
         trend_score = pd.Series(0.0, index=df.index)
         trend_score[spread >= 3] = 0.25
         trend_score[(spread >= 2) & (spread < 3)] = 0.20
         trend_score[(spread >= 1.5) & (spread < 2)] = 0.15
-        # Alignment bonus
         align_bonus = pd.Series(0.0, index=df.index)
         align_bonus[sma50 > sma200] = 0.15
-        total = rsi_score + trend_score + align_bonus
-        conf[mask] = total[mask].clip(0.5, 0.95)
+        vol_bonus = pd.Series(0.0, index=df.index)
+        vol_bonus[vol_r >= 1.5] = 0.10
+        vol_bonus[(vol_r >= 1.2) & (vol_r < 1.5)] = 0.07
+        vol_bonus[(vol_r >= 1.0) & (vol_r < 1.2)] = 0.05
+        total = rsi_score + trend_score + align_bonus + vol_bonus
+        conf[mask] = total[mask].clip(0.50, 0.95)
 
     elif rule_name == "momentum_reversal":
+        # MomentumReversalRule: golden cross + vol >= 0.5x + RSI 30-40 + MACD > signal
+        # Additional: weak reversal gate (hist <= 0.05 AND vol < 1.0)
         golden = sma50 > sma200
-        vol_ok = volume >= (vol_sma * 0.5) if vol_sma is not None else True
+        vol_ok = vol_r >= 0.5
         rsi_recovery = (rsi >= 30) & (rsi <= 40)
         macd_bull = macd > macd_sig
-        mask = golden & vol_ok & rsi_recovery & macd_bull
+        weak_reversal = (macd_hist <= 0.05) & (vol_r < 1.0)
+        mask = golden & vol_ok & rsi_recovery & macd_bull & ~weak_reversal
         conf[mask] = 0.55
         conf[mask & (sma20 > sma50)] += 0.15
         conf[mask & (macd_hist > 0.10)] += 0.10
         conf[mask & (macd_hist > 0.05) & (macd_hist <= 0.10)] += 0.05
         conf[mask & (rsi < 35)] += 0.10
         conf[mask & (rsi >= 35) & (rsi <= 40)] += 0.05
+        conf[mask & (vol_r >= 1.2)] += 0.05
         conf = conf.clip(0, 0.90)
 
     elif rule_name == "trend_continuation":
+        # TrendContinuationRule: full alignment + within ±2% of SMA_20 + RSI 35-60 + vol >= 0.5x
         full_align = (sma20 > sma50) & (sma50 > sma200)
-        at_support = ((close - sma20).abs() / sma20 * 100) <= 2
+        at_support = (dist_pct(close, sma20).abs()) <= 2.0
         rsi_mod = (rsi >= 35) & (rsi <= 60)
-        vol_ok = volume >= (vol_sma * 0.5) if vol_sma is not None else True
+        vol_ok = vol_r >= 0.5
         mask = full_align & at_support & rsi_mod & vol_ok
         conf[mask] = 0.60
         spread20_50 = safe_spread(sma20, sma50)
         spread50_200 = safe_spread(sma50, sma200)
         conf[mask & (spread20_50 > 3)] += 0.10
         conf[mask & (spread50_200 > 5)] += 0.10
+        dist_from_sma = dist_pct(close, sma20).abs()
+        conf[mask & (dist_from_sma < 0.5)] += 0.05
+        conf[mask & (vol_r >= 1.0)] += 0.05
+        conf[mask & (vol_r < 0.8)] -= 0.05
         conf = conf.clip(0, 0.85)
 
     # ── Mining Rules ──
     elif rule_name == "commodity_breakout":
-        sma_ref = sma50 if sma50 is not None else sma20
-        mask = (close > sma_ref * 1.02) & (volume > vol_sma * 1.2) if vol_sma is not None else (close > sma_ref * 1.02)
-        conf[mask] = 0.65
+        # CommodityBreakoutRule: uptrend + spread >= 1% + breakout >= 2% above SMA_20
+        # + RSI 45-75 + vol >= 0.5x
+        uptrend = (sma20 > sma50)
+        trend_strength = safe_spread(sma20, sma50)
+        breakout_pct = safe_spread(close, sma20)
+        mask = uptrend & (trend_strength >= 1.0) & (breakout_pct >= 2.0) & (rsi >= 45) & (rsi <= 75) & (vol_r >= 0.5)
+        conf[mask] = 0.55
+        conf[mask & (breakout_pct > 4.0)] += 0.15
+        conf[mask & (breakout_pct > 3.0) & (breakout_pct <= 4.0)] += 0.10
+        conf[mask & (breakout_pct > 2.0) & (breakout_pct <= 3.0)] += 0.05
+        conf[mask & (vol_r > 1.5)] += 0.10
+        conf[mask & (vol_r > 1.2) & (vol_r <= 1.5)] += 0.05
+        conf[mask & (rsi >= 55) & (rsi <= 65)] += 0.05
+        conf = conf.clip(0, 0.85)
 
     elif rule_name == "miner_metal_ratio":
-        # Simplified: use RSI oversold as proxy (actual ratio needs commodity data)
+        # Simplified proxy: RSI < 35 + golden cross
         mask = (rsi < 35) & (sma50 > sma200)
         conf[mask] = 0.60
 
     elif rule_name == "dollar_weakness":
-        # Simplified: bullish when MACD bullish + uptrend (actual needs DXY data)
+        # Simplified proxy: MACD bullish + uptrend
         mask = (macd > macd_sig) & (sma20 > sma50)
         conf[mask] = 0.55
 
     elif rule_name == "seasonality":
-        # Seasonal months — extract month from index
+        # Mining seasonality: strong months + RSI < 50 + uptrend
         month = df.index.month
-        strong_months = month.isin([1, 2, 8, 9, 11, 12])  # Gold seasonal strength
-        mask = strong_months & (rsi < 50)
+        strong_months = month.isin([1, 2, 8, 9, 11, 12])
+        uptrend = sma20 > sma50
+        mask = strong_months & (rsi >= 25) & (rsi <= 70) & uptrend
         conf[mask] = 0.55
-        conf[mask & (rsi < 40)] = 0.65
+        conf[mask & (rsi < 40)] += 0.10
+        spread = safe_spread(sma20, sma50)
+        conf[mask & (spread > 2)] += 0.05
+        conf = conf.clip(0, 0.85)
 
     elif rule_name == "volume_breakout":
-        vol_ratio = volume / vol_sma if vol_sma is not None else pd.Series(1.0, index=df.index)
-        mask = (vol_ratio >= 1.5) & (close > sma20)
+        # VolumeBreakoutRule: vol >= 1.5x + close > SMA_20
+        mask = (vol_r >= 1.5) & (close > sma20)
         conf[mask] = 0.60
-        conf[mask & (vol_ratio >= 2.0)] = 0.70
+        conf[mask & (vol_r >= 2.0)] = 0.70
 
     # ── Energy Rules ──
     elif rule_name == "energy_momentum":
-        mask = (adx > 20) & (rsi > 40) & (rsi < 70) & (macd > macd_sig)
-        conf[mask] = 0.60
+        # EnergyMomentumRule: golden cross + close > SMA_50 + ADX >= 25 + MACD_HIST > 0
+        # + RSI 45-75 + vol >= 0.8x
+        mask = ((sma50 > sma200) & (close > sma50) & (adx >= 25) &
+                (macd_hist > 0) & (rsi >= 45) & (rsi <= 75) & (vol_r >= 0.8))
+        conf[mask] = 0.55
+        conf[mask & (adx > 35)] += 0.10
+        conf[mask & (adx > 30) & (adx <= 35)] += 0.05
+        conf[mask & (vol_r > 1.5)] += 0.10
+        conf[mask & (vol_r > 1.2) & (vol_r <= 1.5)] += 0.05
+        conf[mask & (rsi >= 50) & (rsi <= 65)] += 0.05
+        conf = conf.clip(0.40, 0.85)
 
     elif rule_name == "energy_mean_reversion":
-        mask = (rsi < 35) & (close <= bb_lower * 1.02) if bb_lower is not None else (rsi < 35)
-        conf[mask] = 0.65
+        # EnergyMeanReversionRule: close >= SMA_200 - 3% + RSI >= 15
+        # + need >= 2 of: RSI<30, BB%<0.10, Stoch_K<20 & Stoch_D<20
+        # + ADX<30 or not(close<SMA_50 & MACD_HIST<0) + vol >= 0.5x
+        above_support = close >= (sma200 * 0.97) if sma200 is not None else True
+        rsi_ok = (rsi >= 15) if rsi is not None else True
+        os_rsi = (rsi < 30) if rsi is not None else False
+        os_bb = (bb_pct < 0.10) if bb_pct is not None else False
+        os_stoch = ((stoch_k < 20) & (stoch_d < 20)) if stoch_k is not None and stoch_d is not None else False
+        oversold_count = os_rsi.astype(int) + os_bb.astype(int) + os_stoch.astype(int)
+        not_freefall = ~((adx > 30) & (close < sma50) & (macd_hist < 0)) if adx is not None else True
+        mask = above_support & rsi_ok & (oversold_count >= 2) & not_freefall & (vol_r >= 0.5)
+        conf[mask] = 0.55
+        conf[mask & (oversold_count >= 3)] += 0.10
+        conf[mask & (oversold_count == 2)] += 0.05
+        conf[mask & (vol_r > 1.5)] += 0.10
+        conf[mask & (vol_r > 1.2) & (vol_r <= 1.5)] += 0.05
+        conf[mask & (close > sma200)] += 0.05
+        conf[mask & (rsi < 22)] += 0.05
+        conf[mask & (rsi >= 22) & (rsi < 25)] += 0.03
+        conf = conf.clip(0.40, 0.85)
 
     elif rule_name == "energy_seasonality":
+        # EnergySeasonalityRule: uptrend + RSI 25-70 + strong month
         month = df.index.month
         strong = month.isin([10, 11, 12, 1, 2])
-        mask = strong & (rsi < 50)
-        conf[mask] = 0.55
+        weak = month.isin([5, 6])
+        uptrend = sma20 > sma50
+        mask = uptrend & (rsi >= 25) & (rsi <= 70) & (strong | weak)
+        conf[mask & strong] = 0.65
+        conf[mask & weak] = 0.40
+        spread = safe_spread(sma20, sma50)
+        conf[mask & (spread > 2)] += 0.05
+        conf = conf.clip(0.40, 0.85)
 
     elif rule_name == "midstream_yield_reversion":
-        mask = (rsi < 35) & (sma50 > sma200)
-        conf[mask] = 0.60
+        # MidstreamYieldReversionRule: discount from SMA_200 >= 5%
+        # + (RSI < 35 or BB% < 0.15) + not freefall + near SMA_20 + vol >= 0.5x
+        discount = safe_spread(sma200, close)  # how far below SMA_200
+        near_sma20 = (dist_pct(close, sma20).abs()) <= 3.0
+        os_check = (rsi < 35) | ((bb_pct < 0.15) if bb_pct is not None else False)
+        not_freefall = ~((adx > 30) & (close < sma50)) if adx is not None else True
+        mask = (discount >= 5.0) & os_check & not_freefall & near_sma20 & (vol_r >= 0.5)
+        conf[mask] = 0.55
+        conf[mask & (discount > 10)] += 0.15
+        conf[mask & (discount > 8) & (discount <= 10)] += 0.10
+        conf[mask & (discount > 6) & (discount <= 8)] += 0.05
+        conf[mask & (rsi < 25)] += 0.05
+        conf[mask & (vol_r > 1.5)] += 0.05
+        conf = conf.clip(0.40, 0.85)
 
     # ── Defense Rules ──
     elif rule_name == "defense_momentum":
-        mask = (adx > 20) & (sma20 > sma50) & (rsi > 40) & (rsi < 65)
-        conf[mask] = 0.60
+        # DefenseMomentumRule: golden cross + close > SMA_50 + ADX >= 20
+        # + MACD_HIST > 0 + RSI 40-72 + vol >= 0.7x
+        mask = ((sma50 > sma200) & (close > sma50) & (adx >= 20) &
+                (macd_hist > 0) & (rsi >= 40) & (rsi <= 72) & (vol_r >= 0.7))
+        conf[mask] = 0.55
+        conf[mask & (adx > 30)] += 0.10
+        conf[mask & (adx > 25) & (adx <= 30)] += 0.05
+        conf[mask & (vol_r > 1.5)] += 0.10
+        conf[mask & (vol_r > 1.2) & (vol_r <= 1.5)] += 0.05
+        conf[mask & (rsi >= 45) & (rsi <= 60)] += 0.05
+        conf = conf.clip(0.40, 0.85)
 
     elif rule_name == "defense_mean_reversion":
-        mask = (rsi < 35) & (sma50 > sma200)
-        conf[mask] = 0.65
+        # DefenseMeanReversionRule: close > SMA_200 + ADX < 25 + BB% < 0.20
+        # + RSI 20-42 + vol >= 0.5x
+        bb_ok = (bb_pct < 0.20) if bb_pct is not None else True
+        mask = ((close > sma200) & (adx < 25) & bb_ok &
+                (rsi >= 20) & (rsi <= 42) & (vol_r >= 0.5))
+        conf[mask] = 0.58
+        conf[mask & (bb_pct < 0.0)] += 0.10
+        conf[mask & (bb_pct >= 0.0) & (bb_pct < 0.05)] += 0.07
+        conf[mask & (bb_pct >= 0.05) & (bb_pct < 0.10)] += 0.04
+        conf[mask & (rsi < 30)] += 0.10
+        conf[mask & (rsi >= 30) & (rsi < 35)] += 0.05
+        conf[mask & (adx < 15)] += 0.05
+        conf[mask & (sma50 > sma200)] += 0.05
+        conf[mask & (sma20 > sma50)] += 0.05
+        conf[mask & (vol_r > 1.5)] += 0.05
+        conf = conf.clip(0.40, 0.90)
 
     elif rule_name == "defense_budget_cycle":
+        # DefenseBudgetCycleRule: golden cross + close > SMA_200 + budget months
+        # + RSI 20-72 + vol >= 0.5x + uptrend
         month = df.index.month
         budget_months = month.isin([9, 10, 11, 12, 1, 2, 3])
-        mask = budget_months & (rsi < 45) & (sma20 > sma50)
+        mask = (budget_months & (sma50 > sma200) & (close > sma200) &
+                (rsi >= 20) & (rsi <= 72) & (vol_r >= 0.5) & (sma20 > sma50))
         conf[mask] = 0.55
+        conf[mask & month.isin([10, 11, 12, 1, 2])] += 0.10
+        conf[mask & month.isin([7, 8, 9])] += 0.05
+        spread = safe_spread(sma20, sma50)
+        conf[mask & (spread > 2)] += 0.05
+        conf[mask & (vol_r > 1.2)] += 0.05
+        conf = conf.clip(0.40, 0.85)
 
     elif rule_name == "defense_counter_cyclical":
-        mask = (rsi < 40) & (sma50 > sma200)
-        conf[mask] = 0.60
+        # DefenseCounterCyclicalRule: close > SMA_50 + uptrend + RSI 40-70 + vol >= 0.5x
+        mask = ((close > sma50) & (sma20 > sma50) & (rsi >= 40) & (rsi <= 70) & (vol_r >= 0.5))
+        conf[mask] = 0.55
+        above_200_pct = safe_spread(close, sma200)
+        conf[mask & (above_200_pct > 10)] += 0.10
+        conf[mask & (above_200_pct > 5) & (above_200_pct <= 10)] += 0.05
+        conf[mask & (rsi >= 45) & (rsi <= 60)] += 0.05
+        spread = safe_spread(sma20, sma50)
+        conf[mask & (spread > 2)] += 0.05
+        conf[mask & (adx > 20)] += 0.05
+        conf[mask & (vol_r > 1.3)] += 0.07
+        conf[mask & (vol_r > 1.1) & (vol_r <= 1.3)] += 0.03
+        conf = conf.clip(0.40, 0.85)
 
     # ── Industrial Rules ──
     elif rule_name == "industrial_mean_reversion":
-        mask = (rsi < 35) & (close <= bb_lower * 1.02) if bb_lower is not None else (rsi < 35)
-        conf[mask] = 0.65
+        # IndustrialMeanReversionRule: close > SMA_200 + golden cross + ADX < 22
+        # + BB% < 0.15 + RSI 22-42 + vol >= 0.5x
+        bb_ok = (bb_pct < 0.15) if bb_pct is not None else True
+        mask = ((close > sma200) & (sma50 > sma200) & (adx < 22) & bb_ok &
+                (rsi >= 22) & (rsi <= 42) & (vol_r >= 0.5))
+        conf[mask] = 0.58
+        conf[mask & (bb_pct < 0.0)] += 0.10
+        conf[mask & (bb_pct >= 0.0) & (bb_pct < 0.05)] += 0.07
+        conf[mask & (bb_pct >= 0.05) & (bb_pct < 0.10)] += 0.03
+        conf[mask & (rsi < 30)] += 0.10
+        conf[mask & (rsi >= 30) & (rsi < 35)] += 0.05
+        conf[mask & (adx < 15)] += 0.05
+        conf[mask & (sma20 > sma50)] += 0.05
+        conf[mask & (vol_r > 1.2)] += 0.05
+        conf = conf.clip(0.40, 0.90)
 
     elif rule_name == "industrial_pullback":
-        mask = (rsi < 40) & (sma20 > sma50) & (sma50 > sma200)
-        conf[mask] = 0.60
+        # IndustrialPullbackRule: golden cross + within -4% to +2.5% of SMA_50
+        # + RSI <= 45 + MACD_HIST >= -0.5
+        dist_50 = dist_pct(close, sma50)
+        macd_ok = (macd_hist >= -0.5) if macd_hist is not None else True
+        mask = ((sma50 > sma200) & (dist_50 >= -4.0) & (dist_50 <= 2.5) &
+                (rsi <= 45) & macd_ok)
+        conf[mask] = 0.55
+        conf[mask & (dist_50.abs() < 1)] += 0.10
+        conf[mask & (dist_50.abs() >= 1) & (dist_50.abs() < 2)] += 0.05
+        conf[mask & (rsi < 35)] += 0.10
+        conf[mask & (rsi >= 35) & (rsi < 40)] += 0.05
+        conf[mask & (macd_hist > 0)] += 0.05
+        conf[mask & (adx < 22)] += 0.05
+        conf[mask & (sma20 > sma50)] += 0.05
+        conf = conf.clip(0.40, 0.85)
 
     elif rule_name == "industrial_seasonality":
+        # IndustrialSeasonalityRule: strong months + uptrend + RSI 25-70
         month = df.index.month
         strong = month.isin([10, 11, 12, 1])
-        mask = strong & (rsi < 50) & (sma20 > sma50)
-        conf[mask] = 0.55
+        weak = month.isin([5, 6])
+        uptrend = sma20 > sma50
+        mask = uptrend & (rsi >= 25) & (rsi <= 70) & (strong | weak)
+        conf[mask & strong] = 0.65
+        conf[mask & weak] = 0.40
+        spread = safe_spread(sma20, sma50)
+        conf[mask & (spread > 2)] += 0.05
+        conf = conf.clip(0.40, 0.85)
 
     # ── Tech Rules ──
     elif rule_name == "tech_ema_pullback":
-        mask = (close <= ema21 * 1.01) & (ema9 > ema21) & (rsi < 45)
-        conf[mask] = 0.60
+        # TechEMAPullbackRule: EMA_21 > SMA_50 > SMA_200 + close > SMA_50
+        # + within -3% to +1.5% of EMA_21 + RSI 38-65 + vol >= 0.7x
+        ema_align = (ema21 > sma50) & (sma50 > sma200) if ema21 is not None else False
+        above_50 = close > sma50
+        dist_ema = dist_pct(close, ema21) if ema21 is not None else pd.Series(99, index=df.index)
+        mask = (ema_align & above_50 & (dist_ema >= -3.0) & (dist_ema <= 1.5) &
+                (rsi >= 38) & (rsi <= 65) & (vol_r >= 0.7))
+        conf[mask] = 0.55
+        conf[mask & (dist_ema.abs() < 0.5)] += 0.15
+        conf[mask & (dist_ema.abs() >= 0.5) & (dist_ema.abs() < 1.0)] += 0.10
+        conf[mask & (dist_ema.abs() >= 1.0) & (dist_ema.abs() < 1.5)] += 0.05
+        conf[mask & (rsi >= 45) & (rsi <= 55)] += 0.05
+        conf[mask & (vol_r > 1.2)] += 0.05
+        conf = conf.clip(0, 0.85)
 
     elif rule_name == "tech_mean_reversion":
-        mask = (rsi < 30) & (close <= bb_lower * 1.02) if bb_lower is not None else (rsi < 30)
-        conf[mask] = 0.70
+        # TechMeanReversionRule: need >= 2 of: RSI<30, BB%<0.10, Stoch_K<20
+        # + near SMA_50 or SMA_200
+        os_rsi = (rsi < 30) if rsi is not None else False
+        os_bb = (bb_pct < 0.10) if bb_pct is not None else False
+        os_stoch = (stoch_k < 20) if stoch_k is not None else False
+        oversold_count = os_rsi.astype(int) + os_bb.astype(int) + os_stoch.astype(int)
+        near_sma50 = (dist_pct(close, sma50).abs()) <= 3.0
+        near_sma200 = (dist_pct(close, sma200).abs()) <= 5.0 if sma200 is not None else False
+        near_support = near_sma50 | near_sma200
+        mask = (oversold_count >= 2) & near_support & (rsi >= 10)
+        conf[mask] = 0.55
+        conf[mask & (oversold_count >= 3)] += 0.15
+        conf[mask & (oversold_count == 2)] += 0.10
+        conf[mask & near_sma200] += 0.10
+        conf = conf.clip(0, 0.85)
 
     elif rule_name == "tech_seasonality":
+        # TechSeasonalityRule: strong months + uptrend + RSI 30-70
         month = df.index.month
         strong = month.isin([10, 11, 1, 4])
-        mask = strong & (rsi < 45)
-        conf[mask] = 0.55
+        weak = month.isin([6, 7, 8, 9])
+        uptrend = sma20 > sma50
+        mask = uptrend & (rsi >= 30) & (rsi <= 70) & (strong | weak)
+        conf[mask & strong] = 0.65
+        conf[mask & weak] = 0.40
+        spread = safe_spread(sma20, sma50)
+        conf[mask & (spread > 2)] += 0.05
+        conf = conf.clip(0.40, 0.85)
 
     elif rule_name == "semi_cycle":
-        mask = (rsi < 35) & (sma50 > sma200) & (macd > macd_sig)
-        conf[mask] = 0.65
+        # SemiCycleRule: golden cross + ADX >= 15 + near SMA_50 or EMA_21
+        # + close > SMA_200 + RSI in range + vol >= 0.8x + MACD_HIST >= -1.0
+        near_ema21 = (dist_pct(close, ema21).abs()) <= 2.0 if ema21 is not None else False
+        near_sma50_semi = (dist_pct(close, sma50).abs()) <= 3.0
+        near_support = near_ema21 | near_sma50_semi
+        macd_ok = (macd_hist >= -1.0) if macd_hist is not None else True
+        mask = ((sma50 > sma200) & (adx >= 15) & near_support &
+                (close > sma200) & (rsi >= 30) & (rsi <= 50) &
+                (vol_r >= 0.8) & macd_ok)
+        conf[mask] = 0.55
+        conf[mask & near_ema21 & (dist_pct(close, ema21).abs() < 1.0)] += 0.10
+        conf[mask & near_sma50_semi & (dist_pct(close, sma50).abs() < 1.5)] += 0.10
+        conf[mask & (rsi < 35)] += 0.10
+        conf[mask & (rsi >= 35) & (rsi < 40)] += 0.05
+        conf[mask & (macd_hist > 0)] += 0.05
+        conf[mask & (vol_r > 1.5)] += 0.05
+        conf = conf.clip(0.40, 0.85)
 
     # ── Financial Rules ──
     elif rule_name == "financial_mean_reversion":
-        bb_os = bb_pct < 0.10 if bb_pct is not None else pd.Series(False, index=df.index)
-        mask = (rsi >= 28) & (rsi <= 42) & bb_os
-        adx_ok = adx < 25 if adx is not None else True
-        mask = mask & adx_ok
-        conf[mask] = 0.65
+        # FinancialMeanReversionRule: golden cross + within 3% of SMA_200
+        # + ADX < 25 + BB% < 0.10 + RSI 28-42 + vol >= 0.5x
+        bb_ok = (bb_pct < 0.10) if bb_pct is not None else False
+        near_200 = (dist_pct(close, sma200).abs()) <= 3.0 if sma200 is not None else True
+        adx_ok = (adx < 25) if adx is not None else True
+        mask = ((sma50 > sma200) & near_200 & adx_ok & bb_ok &
+                (rsi >= 28) & (rsi <= 42) & (vol_r >= 0.5))
+        conf[mask] = 0.60
+        conf[mask & (bb_pct < 0.0)] += 0.10
+        conf[mask & (bb_pct >= 0.0) & (bb_pct < 0.05)] += 0.05
+        conf[mask & (rsi < 32)] += 0.10
+        conf[mask & (rsi >= 32) & (rsi < 35)] += 0.05
+        conf[mask & (adx < 15)] += 0.05
+        conf[mask & (sma20 > sma50)] += 0.05
+        conf[mask & (vol_r > 1.2)] += 0.05
+        conf = conf.clip(0.40, 0.90)
 
     elif rule_name == "financial_pullback":
-        mask = (rsi < 40) & (sma20 > sma50) & (sma50 > sma200)
-        conf[mask] = 0.60
+        # FinancialPullbackRule: golden cross + close > SMA_200 + RSI 30-60
+        # + MACD_HIST >= -0.5 + vol >= 0.6x
+        macd_ok = (macd_hist >= -0.5) if macd_hist is not None else True
+        mask = ((sma50 > sma200) & (close > sma200) &
+                (rsi >= 30) & (rsi <= 60) & macd_ok & (vol_r >= 0.6))
+        conf[mask] = 0.55
+        conf[mask & (rsi >= 38) & (rsi <= 50)] += 0.05
+        conf[mask & (macd_hist > 0)] += 0.05
+        conf[mask & (vol_r > 1.3)] += 0.05
+        conf[mask & (sma20 > sma50)] += 0.05
+        conf = conf.clip(0.40, 0.85)
 
     elif rule_name == "financial_seasonality":
+        # FinancialSeasonalityRule: strong months + uptrend + RSI 25-70
         month = df.index.month
         strong = month.isin([10, 11, 12, 1])
-        mask = strong & (rsi < 50)
-        conf[mask] = 0.55
+        weak = month.isin([5, 6])
+        uptrend = sma20 > sma50
+        mask = uptrend & (rsi >= 25) & (rsi <= 70) & (strong | weak)
+        conf[mask & strong] = 0.65
+        conf[mask & weak] = 0.40
+        spread = safe_spread(sma20, sma50)
+        conf[mask & (spread > 2)] += 0.05
+        conf = conf.clip(0.40, 0.85)
 
     # ── Utility Rules ──
     elif rule_name == "utility_mean_reversion":
-        mask = (rsi < 35) & (close <= bb_lower * 1.02) if bb_lower is not None else (rsi < 35)
-        conf[mask] = 0.65
+        # UtilityMeanReversionRule: close > SMA_200 + golden cross + ADX < 20
+        # + BB% < 0.15 + RSI 25-42 + vol >= 0.5x (excludes nuclear_power)
+        bb_ok = (bb_pct < 0.15) if bb_pct is not None else True
+        mask = ((close > sma200) & (sma50 > sma200) & (adx < 20) & bb_ok &
+                (rsi >= 25) & (rsi <= 42) & (vol_r >= 0.5))
+        conf[mask] = 0.60
+        conf[mask & (bb_pct < 0.0)] += 0.10
+        conf[mask & (bb_pct >= 0.0) & (bb_pct < 0.05)] += 0.07
+        conf[mask & (bb_pct >= 0.05) & (bb_pct < 0.10)] += 0.03
+        conf[mask & (rsi < 30)] += 0.10
+        conf[mask & (rsi >= 30) & (rsi < 35)] += 0.05
+        conf[mask & (adx < 12)] += 0.05
+        conf[mask & (sma20 > sma50)] += 0.05
+        conf[mask & (vol_r > 1.2)] += 0.05
+        conf = conf.clip(0.40, 0.90)
 
     elif rule_name == "utility_rate_reversion":
-        mask = (rsi < 40) & (sma50 > sma200)
-        conf[mask] = 0.60
+        # UtilityRateReversionRule: golden cross + within -3% to +2.5% of SMA_50
+        # + RSI <= 45 + MACD_HIST >= -0.5
+        dist_50 = dist_pct(close, sma50)
+        macd_ok = (macd_hist >= -0.5) if macd_hist is not None else True
+        mask = ((sma50 > sma200) & (dist_50 >= -3.0) & (dist_50 <= 2.5) &
+                (rsi <= 45) & macd_ok)
+        conf[mask] = 0.55
+        conf[mask & (dist_50.abs() < 1)] += 0.10
+        conf[mask & (dist_50.abs() >= 1) & (dist_50.abs() < 2)] += 0.05
+        conf[mask & (rsi < 35)] += 0.10
+        conf[mask & (rsi >= 35) & (rsi < 40)] += 0.05
+        conf[mask & (macd_hist > 0)] += 0.05
+        conf[mask & (sma20 > sma50)] += 0.05
+        conf = conf.clip(0.40, 0.85)
 
     elif rule_name == "utility_seasonality":
+        # UtilitySeasonalityRule: strong months (May-Sep) + uptrend + RSI 25-70
         month = df.index.month
         strong = month.isin([5, 6, 7, 8, 9])
-        mask = strong & (rsi < 50) & (sma20 > sma50)
-        conf[mask] = 0.55
+        uptrend = sma20 > sma50
+        mask = uptrend & (rsi >= 25) & (rsi <= 70) & strong
+        conf[mask] = 0.65
+        spread = safe_spread(sma20, sma50)
+        conf[mask & (spread > 2)] += 0.05
+        conf = conf.clip(0.40, 0.85)
 
     elif rule_name == "nuclear_power_momentum":
-        mask = (adx > 20) & (sma20 > sma50) & (rsi > 40) & (rsi < 65)
-        conf[mask] = 0.60
+        # NuclearPowerMomentumRule: EMA_21 > SMA_50 > SMA_200 + close > SMA_50
+        # + within -6% to +3% of EMA_21 + RSI 30-70 + vol >= 0.6x
+        # + (MACD > signal or MACD_HIST > -0.5)
+        ema_align = (ema21 > sma50) & (sma50 > sma200) if ema21 is not None else False
+        dist_ema = dist_pct(close, ema21) if ema21 is not None else pd.Series(99, index=df.index)
+        macd_ok = (macd > macd_sig) | (macd_hist > -0.5) if macd is not None else True
+        mask = (ema_align & (close > sma50) & (dist_ema >= -6.0) & (dist_ema <= 3.0) &
+                (rsi >= 30) & (rsi <= 70) & (vol_r >= 0.6) & macd_ok)
+        conf[mask] = 0.55
+        conf[mask & (dist_ema.abs() < 1)] += 0.10
+        conf[mask & (dist_ema.abs() >= 1) & (dist_ema.abs() < 2)] += 0.05
+        conf[mask & (macd > macd_sig)] += 0.05
+        conf[mask & (adx > 30)] += 0.05
+        conf[mask & (rsi >= 40) & (rsi <= 55)] += 0.05
+        conf[mask & (vol_r > 1.2)] += 0.05
+        spread = safe_spread(sma20, sma50)
+        conf[mask & (spread > 15)] += 0.05
+        conf = conf.clip(0.40, 0.85)
 
     # ── Consumer Staples Rules ──
     elif rule_name == "consumer_staples_mean_reversion":
-        mask = (rsi < 35) & (close <= bb_lower * 1.02) if bb_lower is not None else (rsi < 35)
-        conf[mask] = 0.65
+        # ConsumerStaplesMeanReversionRule: close > SMA_200 + golden cross + ADX < 18
+        # + BB% < 0.15 + RSI 25-45 + vol >= 0.5x
+        bb_ok = (bb_pct < 0.15) if bb_pct is not None else True
+        mask = ((close > sma200) & (sma50 > sma200) & (adx < 18) & bb_ok &
+                (rsi >= 25) & (rsi <= 45) & (vol_r >= 0.5))
+        conf[mask] = 0.60
+        conf[mask & (bb_pct < 0.0)] += 0.10
+        conf[mask & (bb_pct >= 0.0) & (bb_pct < 0.05)] += 0.07
+        conf[mask & (bb_pct >= 0.05) & (bb_pct < 0.10)] += 0.03
+        conf[mask & (rsi < 30)] += 0.10
+        conf[mask & (rsi >= 30) & (rsi < 35)] += 0.05
+        conf[mask & (adx < 12)] += 0.05
+        conf[mask & (sma20 > sma50)] += 0.05
+        conf[mask & (vol_r > 1.2)] += 0.05
+        conf = conf.clip(0.40, 0.90)
 
     elif rule_name == "consumer_staples_pullback":
-        mask = (rsi < 40) & (sma20 > sma50) & (sma50 > sma200)
-        conf[mask] = 0.60
+        # ConsumerStaplesPullbackRule: golden cross + within -3% to +2% of SMA_50
+        # + RSI <= 45 + MACD_HIST >= -0.3
+        dist_50 = dist_pct(close, sma50)
+        macd_ok = (macd_hist >= -0.3) if macd_hist is not None else True
+        mask = ((sma50 > sma200) & (dist_50 >= -3.0) & (dist_50 <= 2.0) &
+                (rsi <= 45) & macd_ok)
+        conf[mask] = 0.55
+        conf[mask & (dist_50.abs() < 1)] += 0.10
+        conf[mask & (dist_50.abs() >= 1) & (dist_50.abs() < 2)] += 0.05
+        conf[mask & (rsi < 35)] += 0.10
+        conf[mask & (rsi >= 35) & (rsi < 40)] += 0.05
+        conf[mask & (macd_hist > 0)] += 0.05
+        conf[mask & (sma20 > sma50)] += 0.05
+        conf = conf.clip(0.40, 0.85)
 
     elif rule_name == "consumer_staples_seasonality":
+        # ConsumerStaplesSeasonalityRule: strong months (Sep-Dec) + uptrend + RSI 25-70
         month = df.index.month
         strong = month.isin([9, 10, 11, 12])
-        mask = strong & (rsi < 50)
-        conf[mask] = 0.55
+        uptrend = sma20 > sma50
+        mask = uptrend & (rsi >= 25) & (rsi <= 70) & strong
+        conf[mask] = 0.65
+        spread = safe_spread(sma20, sma50)
+        conf[mask & (spread > 2)] += 0.05
+        conf = conf.clip(0.40, 0.85)
 
     # ── Healthcare Rules ──
     elif rule_name == "healthcare_mean_reversion":
-        mask = (rsi < 35) & (close <= bb_lower * 1.02) if bb_lower is not None else (rsi < 35)
-        conf[mask] = 0.65
+        # HealthcareMeanReversionRule: close > SMA_200 + golden cross + ADX < 20
+        # + BB% < 0.15 + RSI 22-42 + vol >= 0.5x
+        bb_ok = (bb_pct < 0.15) if bb_pct is not None else True
+        mask = ((close > sma200) & (sma50 > sma200) & (adx < 20) & bb_ok &
+                (rsi >= 22) & (rsi <= 42) & (vol_r >= 0.5))
+        conf[mask] = 0.60
+        conf[mask & (bb_pct < 0.0)] += 0.10
+        conf[mask & (bb_pct >= 0.0) & (bb_pct < 0.05)] += 0.07
+        conf[mask & (bb_pct >= 0.05) & (bb_pct < 0.10)] += 0.03
+        conf[mask & (rsi < 28)] += 0.10
+        conf[mask & (rsi >= 28) & (rsi < 35)] += 0.05
+        conf[mask & (adx < 12)] += 0.05
+        conf[mask & (sma20 > sma50)] += 0.05
+        conf[mask & (vol_r > 1.2)] += 0.05
+        conf = conf.clip(0.40, 0.90)
 
     elif rule_name == "healthcare_pullback":
-        mask = (rsi < 40) & (sma20 > sma50) & (sma50 > sma200)
-        conf[mask] = 0.60
+        # HealthcarePullbackRule: golden cross + within -3% to +2.5% of SMA_50
+        # + RSI <= 45 + MACD_HIST >= -0.5
+        dist_50 = dist_pct(close, sma50)
+        macd_ok = (macd_hist >= -0.5) if macd_hist is not None else True
+        mask = ((sma50 > sma200) & (dist_50 >= -3.0) & (dist_50 <= 2.5) &
+                (rsi <= 45) & macd_ok)
+        conf[mask] = 0.55
+        conf[mask & (dist_50.abs() < 1)] += 0.10
+        conf[mask & (dist_50.abs() >= 1) & (dist_50.abs() < 2)] += 0.05
+        conf[mask & (rsi < 35)] += 0.10
+        conf[mask & (rsi >= 35) & (rsi < 40)] += 0.05
+        conf[mask & (macd_hist > 0)] += 0.05
+        conf[mask & (sma20 > sma50)] += 0.05
+        conf = conf.clip(0.40, 0.85)
 
     elif rule_name == "healthcare_seasonality":
+        # HealthcareSeasonalityRule: strong months + uptrend + RSI 25-70
         month = df.index.month
         strong = month.isin([10, 11, 1, 4])
-        mask = strong & (rsi < 50)
-        conf[mask] = 0.55
+        weak = month.isin([6, 7, 8])
+        uptrend = sma20 > sma50
+        mask = uptrend & (rsi >= 25) & (rsi <= 70) & (strong | weak)
+        conf[mask & strong] = 0.65
+        conf[mask & weak] = 0.40
+        spread = safe_spread(sma20, sma50)
+        conf[mask & (spread > 2)] += 0.05
+        conf = conf.clip(0.40, 0.85)
 
     else:
         logger.warning(f"Vectorized rule not implemented: {rule_name}, returning zero confidence")
@@ -420,16 +808,11 @@ def compute_entry_signals(
     rules: List[str],
     min_confidence: float,
     max_price_extension_pct: float = 15.0,
-    min_price_extension_pct: float = -15.0,
+    min_price_extension_pct: float = -3.0,
     max_trend_spread_pct: float = 20.0,
     symbol: str = "",
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Compute entry signals for a rule combo on daily data.
-
-    The downside extension threshold is wider than backtrader's -3% because
-    the vectorized engine uses daily closes, while backtrader checks intraday
-    prices that can bounce closer to the SMA during the day. A -15% floor
-    still filters extreme outliers while capturing valid dip-buy setups.
 
     Returns:
         (signal_mask, avg_confidence) — boolean array + confidence array
@@ -474,6 +857,11 @@ def compute_entry_signals(
     with np.errstate(divide="ignore", invalid="ignore"):
         trend_spread = np.where(sma50 > 0, (sma20 - sma50) / sma50 * 100, 0)
     signal &= (trend_spread <= max_trend_spread_pct)
+
+    # Filter 3: Warmup — match backtrader's 200-bar warmup (no signals in first 200 bars)
+    warmup_bars = 200
+    if n > warmup_bars:
+        signal[:warmup_bars] = False
 
     return signal, avg_conf
 

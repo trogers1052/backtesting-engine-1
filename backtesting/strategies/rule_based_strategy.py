@@ -263,12 +263,17 @@ class DecisionEngineStrategy(bt.Strategy):
             ("sma_20", "SMA_20"),
             ("sma_50", "SMA_50"),
             ("sma_200", "SMA_200"),
+            ("ema_9", "EMA_9"),
+            ("ema_21", "EMA_21"),
             ("atr_14", "ATR_14"),
+            ("adx_14", "ADX_14"),
             ("bb_lower", "BB_LOWER"),
             ("bb_mid", "BB_MID"),
             ("bb_upper", "BB_UPPER"),
             ("bb_bandwidth", "BB_BANDWIDTH"),
             ("bb_percent", "BB_PERCENT"),
+            ("stoch_k", "STOCH_K"),
+            ("stoch_d", "STOCH_D"),
             ("volume_sma_20", "volume_sma_20"),
         ]:
             val = self._read_indicator(daily, attr)
