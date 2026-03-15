@@ -525,10 +525,10 @@ def _compute_rule_confidence(
     elif rule_name == "industrial_seasonality":
         # IndustrialSeasonalityRule: uptrend + RSI 25-70
         # Fires on strong + neutral months. Weak months BLOCKED.
-        # Strong=[10,11,12,1], Weak=[5,6]
+        # Strong=[1,2,3,10,11,12], Weak=[6,7,8,9] (union across subsectors)
         month = df.index.month
-        strong = month.isin([10, 11, 12, 1])
-        weak = month.isin([5, 6])
+        strong = month.isin([1, 2, 3, 10, 11, 12])
+        weak = month.isin([6, 7, 8, 9])
         uptrend = sma20 > sma50
         mask = uptrend & (rsi >= 25) & (rsi <= 70) & ~weak
         conf[mask] = 0.55  # base for neutral months
@@ -589,9 +589,9 @@ def _compute_rule_confidence(
     elif rule_name == "semi_cycle":
         # SemiCycleRule: only for semi_equip/memory subsectors
         # golden cross + ADX >= 15 + near SMA_50 or EMA_21
-        # + close > SMA_200 + RSI 25-45 (semi_equip threshold ~35)
+        # + close > SMA_200 + RSI range based on threshold
         # + vol >= 0.8x + MACD_HIST >= -1.0
-        rsi_threshold = 35  # semi_equip default
+        rsi_threshold = 30  # semi_equip default (memory=25)
         near_ema21 = (dist_pct(close, ema21).abs()) <= 2.0 if ema21 is not None else False
         near_sma50_semi = (dist_pct(close, sma50).abs()) <= 3.0
         near_support = near_ema21 | near_sma50_semi
@@ -647,10 +647,10 @@ def _compute_rule_confidence(
     elif rule_name == "financial_seasonality":
         # FinancialSeasonalityRule: uptrend + RSI 25-70
         # Fires on strong + neutral months. Weak months BLOCKED.
-        # Strong=[10,11,12,1], Weak=[5,6]
+        # Strong=[1,2,3,10,11,12], Weak=[5,6,8,9] (union across subsectors)
         month = df.index.month
-        strong = month.isin([10, 11, 12, 1])
-        weak = month.isin([5, 6])
+        strong = month.isin([1, 2, 3, 10, 11, 12])
+        weak = month.isin([5, 6, 8, 9])
         uptrend = sma20 > sma50
         mask = uptrend & (rsi >= 25) & (rsi <= 70) & ~weak
         conf[mask] = 0.55  # base for neutral months
