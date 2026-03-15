@@ -60,7 +60,7 @@ class DecisionEngineStrategy(bt.Strategy):
         ("allow_scale_in", False),  # Allow averaging down
         ("max_scale_ins", 2),  # Max number of scale-ins
         ("scale_in_size", 0.5),  # Size of scale-in relative to initial (0.5 = half size)
-        ("warmup_bars", 200),
+        ("warmup_bars", 0),  # DataCache pre-computes indicators; no additional warmup needed
         ("stop_mode", "fixed"),  # "fixed" or "atr"
         ("atr_multiplier", 2.0),  # ATR multiplier for stop calculation
         ("atr_stop_min_pct", 3.0),  # Minimum stop distance %

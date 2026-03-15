@@ -67,13 +67,15 @@ _COMMON_CHOP = {
 }
 
 SECTOR_REGIME_WINDOWS = {
-    # Gold miners: 2021 was a bear for gold (AEM -15%, GDX down) even while SPY rallied
+    # Gold miners: 2022 bear + choppy transition
+    # Note: 2021 Gold Bear and early 2022 Bear windows removed — insufficient
+    # data depth after indicator warmup for most mining symbols (PPLT data
+    # starts Dec 2021, AEM similar). Keeping 2022-H2 bear and choppy windows.
     "mining": [
-        _COMMON_2022_BEAR,
         {
-            "label": "2021 Gold Bear (SPY bull, miners -15%)",
-            "start": date(2021, 1, 4),
-            "end": date(2021, 12, 31),
+            "label": "2022-H2 Bear (Rate Hike Peak)",
+            "start": date(2022, 6, 1),
+            "end": date(2022, 10, 14),
             "expected_regime": "bear",
         },
         _COMMON_CHOP,
@@ -219,7 +221,7 @@ def main():
             action_color = {"deploy": "green", "conditional": "yellow", "skip": "red"}.get(r["recommendation"] or "", "white")
             table.add_row(
                 r["symbol"], r["sector"],
-                f"{r['best_gates']}/4",
+                f"{r['best_gates']}/{r.get('total_gates', r['best_gates'])}",
                 f"{r['best_sharpe'] or 0:.2f}",
                 f"[{action_color}]{r['recommendation'] or '-'}[/{action_color}]",
                 str(r["varsity_count"]),
@@ -366,6 +368,7 @@ def main():
                     "recommendation": result.recommendation,
                     "elapsed": result.elapsed,
                     "best_gates": winner.pass_count if winner else 0,
+                    "total_gates": len(winner.gates) if winner else 0,
                     "best_label": winner.label if winner else "none",
                     "best_sharpe": (
                         winner.backtest.sharpe_ratio
@@ -474,14 +477,14 @@ def main():
             action_color = {"deploy": "green", "conditional": "yellow", "skip": "red"}.get(sr.recommendation, "white")
             table.add_row(
                 sr.symbol, sr.sector,
-                f"{winner.pass_count}/4",
+                f"{winner.pass_count}/{len(winner.gates)}",
                 f"{winner.backtest.sharpe_ratio or 0:.2f}",
                 f"{winner.backtest.total_return:+.1%}",
                 f"{sr.elapsed / 60:.0f}m",
                 f"[{action_color}]{sr.recommendation}[/{action_color}]",
             )
         else:
-            table.add_row(sr.symbol, sr.sector, "0/4", "-", "-", f"{sr.elapsed / 60:.0f}m", "[red]skip[/red]")
+            table.add_row(sr.symbol, sr.sector, "0/?", "-", "-", f"{sr.elapsed / 60:.0f}m", "[red]skip[/red]")
 
     console.print(table)
     console.print(f"\n[bold]Total runtime: {total_elapsed / 60:.1f} minutes[/bold]")

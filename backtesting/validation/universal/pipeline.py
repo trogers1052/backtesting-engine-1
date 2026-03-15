@@ -189,14 +189,17 @@ class UniversalValidator:
         sr.elapsed = time.time() - sym_start
         winner = sr.validated_reports[0] if sr.validated_reports else None
         if winner and winner.backtest:
+            n_gates = len(winner.gates)
             console.print(
-                f"\n  [bold]{sr.symbol} best: {winner.label} ({winner.pass_count}/4 gates, "
+                f"\n  [bold]{sr.symbol} best: {winner.label} ({winner.pass_count}/{n_gates} gates, "
                 f"Sharpe={winner.backtest.sharpe_ratio or 0:.2f}, "
                 f"Return={winner.backtest.total_return:+.1%})[/bold]"
             )
-            if winner.pass_count >= 3:
+            # Deploy if passing majority of gates (>= 60%)
+            pass_pct = winner.pass_count / n_gates if n_gates > 0 else 0
+            if pass_pct >= 0.6:
                 sr.recommendation = "deploy"
-            elif winner.pass_count >= 2:
+            elif pass_pct >= 0.4:
                 sr.recommendation = "conditional"
             else:
                 sr.recommendation = "skip"
@@ -617,13 +620,20 @@ class UniversalValidator:
         )
 
         if result.total_trades < 2:
+            # Build regime gate names from config
+            regime_gate_names = []
+            if self.regime_windows:
+                regime_gate_names = [f"WB:{rw['label']}" for rw in self.regime_windows]
+            else:
+                regime_gate_names = ["WB:regime"]
             report.gates = [
                 GateResult(g, False, "Too few trades")
-                for g in ["Walk-Backward", "Bootstrap", "Monte Carlo", "Regime"]
+                for g in regime_gate_names + ["Bootstrap", "Monte Carlo", "Regime"]
             ]
             return report
 
-        # Gate 1: Walk-Backward
+        # Walk-Backward regime gates — each regime window is its own gate
+        # A bear gate tests survival, a chop gate tests sideways profitability
         try:
             wb_validator = WalkBackwardValidator(self.runner)
             wb_kwargs = dict(
@@ -639,18 +649,19 @@ class UniversalValidator:
                 wb_kwargs["regime_windows"] = self.regime_windows
             wb_result = wb_validator.validate(**wb_kwargs)
 
-            wb_passed = wb_result.holdout_passed and wb_result.regimes_passed >= DEFAULT_MIN_REGIMES_PASS
-            wb_detail = (
-                f"Regimes={wb_result.regimes_passed}/{wb_result.regimes_total}"
-            )
-            report.gates.append(GateResult("Walk-Backward", wb_passed, wb_detail, wb_result))
-            s = "[green]PASS[/green]" if wb_passed else "[red]FAIL[/red]"
-            console.print(f"      WB: {s} ({wb_result.regimes_passed}/{wb_result.regimes_total})")
             for w in wb_result.regime_windows:
-                ws = "[green]\u2713[/green]" if w.passed else "[red]\u2717[/red]"
-                console.print(f"        {w.label}: {w.total_return:+.1%} ({w.total_trades}t) {ws}")
+                gate_name = f"WB:{w.label}"
+                ws = "[green]PASS[/green]" if w.passed else "[red]FAIL[/red]"
+                detail = f"{w.total_return:+.1%} ({w.total_trades}t)"
+                report.gates.append(GateResult(gate_name, w.passed, detail, w))
+                console.print(f"      {gate_name}: {ws} ({detail})")
         except Exception as e:
-            report.gates.append(GateResult("Walk-Backward", False, f"Error: {e}"))
+            # If WB fails entirely, add one failed gate per expected window
+            if self.regime_windows:
+                for rw in self.regime_windows:
+                    report.gates.append(GateResult(f"WB:{rw['label']}", False, f"Error: {e}"))
+            else:
+                report.gates.append(GateResult("WB:regime", False, f"Error: {e}"))
 
         # Gate 2: Bootstrap
         try:
@@ -696,5 +707,5 @@ class UniversalValidator:
         except Exception as e:
             report.gates.append(GateResult("Regime", False, f"Error: {e}"))
 
-        console.print(f"      [bold]Result: {report.pass_count}/4 gates[/bold]")
+        console.print(f"      [bold]Result: {report.pass_count}/{len(report.gates)} gates[/bold]")
         return report

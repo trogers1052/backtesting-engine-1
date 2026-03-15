@@ -891,10 +891,10 @@ def compute_entry_signals(
         trend_spread = np.where(sma50 > 0, (sma20 - sma50) / sma50 * 100, 0)
     signal &= (trend_spread <= max_trend_spread_pct)
 
-    # Filter 3: Warmup — match backtrader's 200-bar warmup (no signals in first 200 bars)
-    warmup_bars = 200
-    if n > warmup_bars:
-        signal[:warmup_bars] = False
+    # Note: no additional warmup needed here. The DataCache pre-computes indicators
+    # and drops NaN rows, so bar 0 already has valid SMA_200/RSI/MACD.
+    # Backtrader's 200-bar warmup serves the same purpose (waiting for indicators
+    # to stabilize), so both engines start trading at the same effective point.
 
     return signal, avg_conf
 
@@ -1085,14 +1085,22 @@ def simulate_trades(
     total_return = (final_value - initial_cash) / initial_cash
 
     # Sharpe ratio (annualized from trade returns)
-    if total_trades >= 2:
+    # Require minimum 5 trades for meaningful Sharpe; cap at 10.0
+    # Apply trade count weight: configs with 35+ trades get full Sharpe,
+    # fewer trades get penalized to prevent thin-sample configs from
+    # dominating rankings over statistically robust ones.
+    if total_trades >= 5:
         trade_returns = np.array([t["profit_pct"] for t in trades])
         mean_r = trade_returns.mean()
         std_r = trade_returns.std()
-        if std_r > 0:
-            # Annualize: assume ~50 trades/year as baseline
+        if std_r > 1e-6:
             trades_per_year = min(total_trades * 252 / max((daily_dates[-1] - daily_dates[0]).days, 1), 252)
             sharpe = (mean_r / std_r) * np.sqrt(trades_per_year)
+            sharpe = min(sharpe, 10.0)
+            # Trade count weight: full credit at 35+ trades, linear penalty below
+            # 15 trades → 43% weight, 25 trades → 71%, 35+ trades → 100%
+            trade_weight = min(total_trades / 35.0, 1.0)
+            sharpe *= trade_weight
         else:
             sharpe = 0
     else:
